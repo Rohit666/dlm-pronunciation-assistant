@@ -1,30 +1,25 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate } from "react-router-dom";
 
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from "../context/AuthContext";
 
-function ProtectedRoute({
-  children,
-  allowedRoles,
-}) {
-  const { user, loading } = useAuth();
-
+function ProtectedRoute({ children, roles = [] }) {
+  const { user, loading, isAuthenticated } = useAuth();
+  console.log({
+    loading,
+    isAuthenticated,
+    user,
+  });
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading...
-      </div>
-    );
+    return null;
   }
 
-  if (!user) {
-    return <Navigate to="/" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/" />;
   }
 
-  if (
-    allowedRoles &&
-    !allowedRoles.includes(user.role)
-  ) {
-    return <Navigate to="/" replace />;
+  if (roles.length > 0 && !roles.includes(user?.role)) {
+    console.log("Unauthorized access attempt by user with role:", user?.role);
+    return <Navigate to="/" />;
   }
 
   return children;

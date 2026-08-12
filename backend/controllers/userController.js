@@ -1,6 +1,6 @@
-const bcrypt = require('bcryptjs');
+const bcrypt = require("bcryptjs");
 
-const User = require('../models/User');
+const { User }  = require("../models");
 
 exports.createUser = async (req, res) => {
   try {
@@ -10,7 +10,7 @@ exports.createUser = async (req, res) => {
     if (!name || !email || !password || !role) {
       return res.status(400).json({
         success: false,
-        message: 'All fields are required',
+        message: "All fields are required",
       });
     }
 
@@ -22,7 +22,7 @@ exports.createUser = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Email already exists',
+        message: "Email already exists",
       });
     }
 
@@ -39,7 +39,7 @@ exports.createUser = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'User created successfully',
+      message: "User created successfully",
       user: {
         id: user.id,
         name: user.name,
@@ -52,7 +52,7 @@ exports.createUser = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Server error',
+      message: "Server error",
     });
   }
 };
@@ -61,9 +61,9 @@ exports.getUsers = async (req, res) => {
   try {
     const users = await User.findAll({
       attributes: {
-        exclude: ['password'],
+        exclude: ["password"],
       },
-      order: [['id', 'DESC']],
+      order: [["id", "DESC"]],
     });
 
     res.json({
@@ -75,7 +75,68 @@ exports.getUsers = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Server error',
+      message: "Server error",
+    });
+  }
+};
+exports.deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    await user.destroy();
+
+    res.json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+exports.updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { name, email } = req.body;
+
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    user.name = name;
+    user.email = email;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "User updated successfully",
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error",
     });
   }
 };

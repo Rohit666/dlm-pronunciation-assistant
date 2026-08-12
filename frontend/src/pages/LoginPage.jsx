@@ -1,18 +1,25 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
-
-import { useAuth } from '../context/AuthContext';
-
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../services/api";
+import { useForm } from "react-hook-form";
+import { useAuth } from "../context/AuthContext";
+import FormInput from "../components/forms/FormInput";
+import { ROUTES } from "../constants/routes";
 function LoginPage() {
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
   });
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm();
 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-    const { login } = useAuth();
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     setFormData({
@@ -22,40 +29,33 @@ function LoginPage() {
   };
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+    //e.preventDefault();
 
     try {
       setLoading(true);
 
-      const response = await api.post(
-  '/auth/login',
-  formData
-);
+      const response = await api.post("/auth/login", formData);
+      console.log(response.data);
+      login({
+        user: response.data.user,
+        token: response.data.token,
+      });
 
-     login(
-  response.data.user,
-  response.data.token
-);
+      if (response.data.user.role === "admin") {
+        navigate(ROUTES.ADMIN_DASHBOARD);
+      }
 
-if (response.data.user.role === 'admin') {
-  navigate('/admin');
-}
+      if (response.data.user.role === "mentor") {
+        navigate(ROUTES.MENTOR_DASHBOARD);
+      }
 
-if (response.data.user.role === 'mentor') {
-  navigate('/mentor');
-}
-
-if (response.data.user.role === 'mentee') {
-  navigate('/mentee');
-}
-
+      if (response.data.user.role === "mentee") {
+        navigate(ROUTES.MENTEE_DASHBOARD);
+      }
     } catch (error) {
       console.error(error);
 
-      alert(
-        error?.response?.data?.message ||
-        'Login failed'
-      );
+      alert(error?.response?.data?.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -63,59 +63,37 @@ if (response.data.user.role === 'mentee') {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-indigo-600 via-blue-500 to-cyan-400 p-4">
-      
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
-        
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800">
-            DLM
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-800">DLM</h1>
 
-          <p className="text-gray-500 mt-2">
-            Pronunciation Assistant
-          </p>
+          <p className="text-gray-500 mt-2">Pronunciation Assistant</p>
         </div>
 
-        <form
-          onSubmit={handleLogin}
-          className="space-y-5"
-        >
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Email
-            </label>
-
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="Enter email"
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Password
-            </label>
-
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Enter password"
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
+        <form onSubmit={handleSubmit(handleLogin)} className="space-y-5">
+          <FormInput
+            label="Email"
+            type="email"
+            name="email"
+            register={register}
+            value={formData.email}
+            fnOnChange={handleChange}
+          />
+          <FormInput
+            label="Password"
+            type="password"
+            name="password"
+            register={register}
+            value={formData.password}
+            fnOnChange={handleChange}
+          />
 
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 text-white font-semibold py-3 rounded-xl shadow-lg"
           >
-            {loading ? 'Signing In...' : 'Sign In'}
+            {loading ? "Signing In..." : "Sign In"}
           </button>
         </form>
       </div>

@@ -6,3 +6,7 @@ build
 coverage
 .vscode
 .DS_Store
+backend/uploads/
+__pycache__/
+*.pyc
+ai-runtime/.venv/ 

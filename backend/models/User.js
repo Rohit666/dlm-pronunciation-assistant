@@ -1,47 +1,53 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+module.exports = (sequelize, DataTypes) => {
+  const User = sequelize.define(
+    "User",
+    {
+      id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+      },
 
-const User = sequelize.define(
-  'User',
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      primaryKey: true,
+      name: {
+        type: DataTypes.STRING(150),
+        allowNull: false,
+      },
+
+      email: {
+        type: DataTypes.STRING(150),
+        allowNull: false,
+        unique: true,
+      },
+
+      password: {
+        type: DataTypes.STRING(255),
+        allowNull: false,
+      },
+
+      role: {
+        type: DataTypes.ENUM("admin", "mentor", "mentee"),
+        allowNull: false,
+      },
+
+      status: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+      },
     },
-
-    name: {
-      type: DataTypes.STRING(150),
-      allowNull: false,
+    {
+      tableName: "users",
+      timestamps: true,
+      createdAt: "created_at",
+      updatedAt: "updated_at",
     },
-
-    email: {
-      type: DataTypes.STRING(150),
-      allowNull: false,
-      unique: true,
-    },
-
-    password: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
-    },
-
-    role: {
-      type: DataTypes.ENUM('admin', 'mentor', 'mentee'),
-      allowNull: false,
-    },
-
-    status: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-    },
-  },
-  {
-    tableName: 'users',
-    timestamps: true,
-    createdAt: 'created_at',
-    updatedAt: 'updated_at',
-  }
-);
-
-module.exports = User;
+  );
+  User.associate = (models) => {
+    User.hasMany(models.Batch, {
+      foreignKey: "mentor_id",
+    });
+    User.hasOne(models.Mentee, {
+      foreignKey: "user_id",
+    });
+  };
+  return User;
+};

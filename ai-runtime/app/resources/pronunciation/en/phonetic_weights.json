@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+
+  "consonant": {
+    "type": 0.05,
+    "place": 0.35,
+    "manner": 0.35,
+    "voicing": 0.25
+  },
+
+  "vowel": {
+    "height": 0.35,
+    "backness": 0.3,
+    "rounding": 0.15,
+    "length": 0.2
+  },
+
+  "diphthong": {
+    "startVowel": 0.4,
+    "endVowel": 0.4,
+    "glide": 0.2
+  }
+}

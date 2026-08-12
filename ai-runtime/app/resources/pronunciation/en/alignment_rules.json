@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+
+  "gapPenalty": -0.6,
+
+  "minimumSimilarity": 0.3,
+
+  "exactMatchThreshold": 0.95
+}

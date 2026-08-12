@@ -1,0 +1,8 @@
+{
+  "text": 0.1,
+  "ipa": 0.5,
+  "dictionary": 0.2,
+  "morphology_bonus": 0.1,
+  "dictionary_bonus": 0.1,
+  "accept_threshold": 0.75
+}

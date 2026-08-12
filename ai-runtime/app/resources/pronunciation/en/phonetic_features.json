@@ -1,0 +1,808 @@
+[
+  {
+    "symbol": "p",
+    "language": "en",
+    "family": "P/B",
+    "type": "consonant",
+    "place": "bilabial",
+    "manner": "plosive",
+    "voicing": "voiceless",
+    "articulator": "lips",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 1
+    },
+    "commonSubstitutions": ["b"],
+    "teachingTip": "Press both lips together and release the air sharply without using your voice."
+  },
+  {
+    "symbol": "b",
+    "language": "en",
+    "family": "P/B",
+    "type": "consonant",
+    "place": "bilabial",
+    "manner": "plosive",
+    "voicing": "voiced",
+    "articulator": "lips",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 1
+    },
+    "commonSubstitutions": ["p"],
+    "teachingTip": "Press both lips together and release the air while vibrating your vocal cords."
+  },
+  {
+    "symbol": "m",
+    "language": "en",
+    "family": "M",
+    "type": "consonant",
+    "place": "bilabial",
+    "manner": "nasal",
+    "voicing": "voiced",
+    "articulator": "lips",
+    "airflow": "nasal",
+    "difficulty": {
+      "esl": 1
+    },
+    "commonSubstitutions": ["n"],
+    "teachingTip": "Close your lips and allow the sound to resonate through your nose."
+  },
+  {
+    "symbol": "f",
+    "language": "en",
+    "family": "F/V",
+    "type": "consonant",
+    "place": "labiodental",
+    "manner": "fricative",
+    "voicing": "voiceless",
+    "articulator": "lips",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["v", "p"],
+    "teachingTip": "Rest your upper teeth lightly on your lower lip and let the air flow continuously."
+  },
+  {
+    "symbol": "v",
+    "language": "en",
+    "family": "F/V",
+    "type": "consonant",
+    "place": "labiodental",
+    "manner": "fricative",
+    "voicing": "voiced",
+    "articulator": "lips",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["f", "b"],
+    "teachingTip": "Rest your upper teeth on your lower lip and produce a voiced continuous sound."
+  },
+  {
+    "symbol": "w",
+    "language": "en",
+    "family": "W",
+    "type": "consonant",
+    "place": "labial-velar",
+    "manner": "approximant",
+    "voicing": "voiced",
+    "articulator": "lips",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["v", "ʋ"],
+    "teachingTip": "Round your lips before smoothly moving into the following vowel."
+  },
+  {
+    "symbol": "ʍ",
+    "language": "en",
+    "family": "W",
+    "type": "consonant",
+    "place": "labial-velar",
+    "manner": "fricative",
+    "voicing": "voiceless",
+    "articulator": "lips",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 5
+    },
+    "commonSubstitutions": ["w"],
+    "teachingTip": "Round your lips and release a gentle breath without using your voice."
+  },
+
+  {
+    "symbol": "t",
+    "language": "en",
+    "family": "T/D",
+    "type": "consonant",
+    "place": "alveolar",
+    "manner": "plosive",
+    "voicing": "voiceless",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 1
+    },
+    "commonSubstitutions": ["d"],
+    "teachingTip": "Place the tip of your tongue just behind your upper front teeth and release the air without using your voice."
+  },
+  {
+    "symbol": "d",
+    "language": "en",
+    "family": "T/D",
+    "type": "consonant",
+    "place": "alveolar",
+    "manner": "plosive",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 1
+    },
+    "commonSubstitutions": ["t"],
+    "teachingTip": "Touch the tongue behind the upper front teeth and release while vibrating your vocal cords."
+  },
+  {
+    "symbol": "n",
+    "language": "en",
+    "family": "N",
+    "type": "consonant",
+    "place": "alveolar",
+    "manner": "nasal",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "nasal",
+    "difficulty": {
+      "esl": 1
+    },
+    "commonSubstitutions": ["m"],
+    "teachingTip": "Touch the tongue behind the upper front teeth and let the sound pass through your nose."
+  },
+  {
+    "symbol": "s",
+    "language": "en",
+    "family": "S/Z",
+    "type": "consonant",
+    "place": "alveolar",
+    "manner": "fricative",
+    "voicing": "voiceless",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["z", "ʃ"],
+    "teachingTip": "Keep the tongue close to the ridge behind the teeth and allow a narrow stream of air to pass."
+  },
+  {
+    "symbol": "z",
+    "language": "en",
+    "family": "S/Z",
+    "type": "consonant",
+    "place": "alveolar",
+    "manner": "fricative",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["s"],
+    "teachingTip": "Produce the same mouth position as /s/ while vibrating your vocal cords."
+  },
+  {
+    "symbol": "l",
+    "language": "en",
+    "family": "L",
+    "type": "consonant",
+    "place": "alveolar",
+    "manner": "lateral_approximant",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "lateral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["r"],
+    "teachingTip": "Touch the tongue tip behind the upper teeth while allowing air to flow around the sides of the tongue."
+  },
+  {
+    "symbol": "r",
+    "language": "en",
+    "family": "R",
+    "type": "consonant",
+    "place": "postalveolar",
+    "manner": "approximant",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 5
+    },
+    "commonSubstitutions": ["l", "w"],
+    "teachingTip": "Curl the tongue slightly backward without touching the roof of the mouth, and keep the lips relaxed."
+  },
+  {
+    "symbol": "θ",
+    "language": "en",
+    "family": "TH",
+    "type": "consonant",
+    "place": "dental",
+    "manner": "fricative",
+    "voicing": "voiceless",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 5
+    },
+    "commonSubstitutions": ["t", "f"],
+    "teachingTip": "Place the tip of your tongue gently between your upper and lower teeth and let the air pass without using your voice."
+  },
+  {
+    "symbol": "ð",
+    "language": "en",
+    "family": "TH",
+    "type": "consonant",
+    "place": "dental",
+    "manner": "fricative",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 5
+    },
+    "commonSubstitutions": ["d", "z"],
+    "teachingTip": "Place your tongue gently between your teeth and let the air pass while vibrating your vocal cords."
+  },
+  {
+    "symbol": "ʃ",
+    "language": "en",
+    "family": "SH",
+    "type": "consonant",
+    "place": "postalveolar",
+    "manner": "fricative",
+    "voicing": "voiceless",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["s"],
+    "teachingTip": "Raise the front of your tongue slightly behind the alveolar ridge and let the air flow smoothly."
+  },
+  {
+    "symbol": "ʒ",
+    "language": "en",
+    "family": "SH",
+    "type": "consonant",
+    "place": "postalveolar",
+    "manner": "fricative",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 4
+    },
+    "commonSubstitutions": ["z", "ʃ"],
+    "teachingTip": "Produce the SH mouth position while vibrating your vocal cords."
+  },
+  {
+    "symbol": "tʃ",
+    "language": "en",
+    "family": "CH",
+    "type": "consonant",
+    "place": "postalveolar",
+    "manner": "affricate",
+    "voicing": "voiceless",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["t", "ʃ"],
+    "teachingTip": "Begin with a brief tongue closure and release immediately into a SH sound."
+  },
+  {
+    "symbol": "dʒ",
+    "language": "en",
+    "family": "CH",
+    "type": "consonant",
+    "place": "postalveolar",
+    "manner": "affricate",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 4
+    },
+    "commonSubstitutions": ["d", "ʒ"],
+    "teachingTip": "Begin with a voiced tongue closure and smoothly release into a voiced SH sound."
+  },
+  {
+    "symbol": "j",
+    "language": "en",
+    "family": "Y",
+    "type": "consonant",
+    "place": "palatal",
+    "manner": "approximant",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["i"],
+    "teachingTip": "Raise the middle of your tongue toward the roof of your mouth without touching it."
+  },
+  {
+    "symbol": "k",
+    "language": "en",
+    "family": "K/G",
+    "type": "consonant",
+    "place": "velar",
+    "manner": "plosive",
+    "voicing": "voiceless",
+    "articulator": "back_tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 1
+    },
+    "commonSubstitutions": ["g"],
+    "teachingTip": "Raise the back of your tongue to touch the soft palate and release the air sharply without using your voice."
+  },
+  {
+    "symbol": "g",
+    "language": "en",
+    "family": "K/G",
+    "type": "consonant",
+    "place": "velar",
+    "manner": "plosive",
+    "voicing": "voiced",
+    "articulator": "back_tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 1
+    },
+    "commonSubstitutions": ["k"],
+    "teachingTip": "Raise the back of your tongue against the soft palate and release while vibrating your vocal cords."
+  },
+  {
+    "symbol": "ŋ",
+    "language": "en",
+    "family": "NG",
+    "type": "consonant",
+    "place": "velar",
+    "manner": "nasal",
+    "voicing": "voiced",
+    "articulator": "back_tongue",
+    "airflow": "nasal",
+    "difficulty": {
+      "esl": 4
+    },
+    "commonSubstitutions": ["n", "ŋg"],
+    "teachingTip": "Raise the back of your tongue to the soft palate and let the sound resonate through your nose without releasing a 'g' sound."
+  },
+  {
+    "symbol": "h",
+    "language": "en",
+    "family": "H",
+    "type": "consonant",
+    "place": "glottal",
+    "manner": "fricative",
+    "voicing": "voiceless",
+    "articulator": "glottis",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": [],
+    "teachingTip": "Keep your mouth relaxed and gently push air through your throat without vibrating your vocal cords."
+  },
+  {
+    "symbol": "iː",
+    "language": "en",
+    "family": "Long Vowels",
+    "type": "vowel",
+    "height": "close",
+    "backness": "front",
+    "rounding": "unrounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["ɪ"],
+    "teachingTip": "Raise the front of your tongue high in your mouth, keep your lips relaxed, and hold the sound slightly longer."
+  },
+  {
+    "symbol": "ɪ",
+    "language": "en",
+    "family": "Short Vowels",
+    "type": "vowel",
+    "height": "near-close",
+    "backness": "front",
+    "rounding": "unrounded",
+    "length": "short",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["iː"],
+    "teachingTip": "Keep your tongue high but relaxed and produce a short, quick sound."
+  },
+  {
+    "symbol": "e",
+    "language": "en",
+    "family": "Short Vowels",
+    "type": "vowel",
+    "height": "close-mid",
+    "backness": "front",
+    "rounding": "unrounded",
+    "length": "short",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["eɪ"],
+    "teachingTip": "Keep the tongue in the front-middle of your mouth with relaxed lips and produce a short sound."
+  },
+  {
+    "symbol": "æ",
+    "language": "en",
+    "family": "Short Vowels",
+    "type": "vowel",
+    "height": "near-open",
+    "backness": "front",
+    "rounding": "unrounded",
+    "length": "short",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 5
+    },
+    "commonSubstitutions": ["ɛ", "a"],
+    "teachingTip": "Open your mouth wider than for /e/, lower your jaw, and keep the tongue toward the front."
+  },
+  {
+    "symbol": "ɛ",
+    "language": "en",
+    "family": "Short Vowels",
+    "type": "vowel",
+    "height": "open-mid",
+    "backness": "front",
+    "rounding": "unrounded",
+    "length": "short",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["e", "æ"],
+    "teachingTip": "Lower your tongue slightly from /e/ and keep your mouth comfortably open."
+  },
+  {
+    "symbol": "ə",
+    "language": "en",
+    "family": "Schwa",
+    "practiceGroup": "Central Vowels",
+    "type": "vowel",
+    "height": "mid",
+    "backness": "central",
+    "rounding": "unrounded",
+    "length": "short",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 5
+    },
+    "commonSubstitutions": ["ʌ", "ɜː"],
+    "teachingTip": "Relax your tongue completely and produce a short, neutral sound. The schwa is the most common vowel in spoken English."
+  },
+  {
+    "symbol": "ʌ",
+    "language": "en",
+    "family": "Short Vowels",
+    "practiceGroup": "Central Vowels",
+    "type": "vowel",
+    "height": "open-mid",
+    "backness": "central",
+    "rounding": "unrounded",
+    "length": "short",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 4
+    },
+    "commonSubstitutions": ["ə", "ɑː"],
+    "teachingTip": "Keep your tongue low and central with relaxed lips and produce a short vowel."
+  },
+  {
+    "symbol": "ɜː",
+    "language": "en",
+    "family": "Long Vowels",
+    "practiceGroup": "Central Vowels",
+    "type": "vowel",
+    "height": "mid",
+    "backness": "central",
+    "rounding": "unrounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 5
+    },
+    "commonSubstitutions": ["ə"],
+    "teachingTip": "Keep the tongue relaxed in the center of the mouth and sustain the vowel longer than the schwa."
+  },
+  {
+    "symbol": "uː",
+    "language": "en",
+    "family": "Long Vowels",
+    "practiceGroup": "Back Vowels",
+    "type": "vowel",
+    "height": "close",
+    "backness": "back",
+    "rounding": "rounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["ʊ"],
+    "teachingTip": "Raise the back of your tongue high, round your lips, and hold the vowel slightly longer."
+  },
+  {
+    "symbol": "ʊ",
+    "language": "en",
+    "family": "Short Vowels",
+    "practiceGroup": "Back Vowels",
+    "type": "vowel",
+    "height": "near-close",
+    "backness": "back",
+    "rounding": "rounded",
+    "length": "short",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["uː"],
+    "teachingTip": "Keep your lips rounded with a relaxed tongue and produce a short vowel."
+  },
+  {
+    "symbol": "ɔː",
+    "language": "en",
+    "family": "Long Vowels",
+    "practiceGroup": "Back Vowels",
+    "type": "vowel",
+    "height": "open-mid",
+    "backness": "back",
+    "rounding": "rounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 4
+    },
+    "commonSubstitutions": ["ɒ"],
+    "teachingTip": "Lower the back of your tongue slightly, round your lips, and sustain the sound."
+  },
+  {
+    "symbol": "ɒ",
+    "language": "en",
+    "family": "Short Vowels",
+    "practiceGroup": "Back Vowels",
+    "type": "vowel",
+    "height": "open",
+    "backness": "back",
+    "rounding": "rounded",
+    "length": "short",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 4
+    },
+    "commonSubstitutions": ["ɔː", "ɑː"],
+    "teachingTip": "Open your mouth comfortably, round your lips, and produce a short back vowel."
+  },
+  {
+    "symbol": "ɑː",
+    "language": "en",
+    "family": "Long Vowels",
+    "practiceGroup": "Back Vowels",
+    "type": "vowel",
+    "height": "open",
+    "backness": "back",
+    "rounding": "unrounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["ʌ", "ɒ"],
+    "teachingTip": "Lower your jaw, keep your lips relaxed, and sustain the vowel with the tongue low in the mouth."
+  },
+  {
+    "symbol": "eɪ",
+    "language": "en",
+    "family": "Diphthongs",
+    "practiceGroup": "Closing Diphthongs",
+    "type": "diphthong",
+    "height": "mid",
+    "backness": "front",
+    "rounding": "unrounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["e"],
+    "teachingTip": "Start with the /e/ sound and smoothly glide toward /ɪ/ without pausing."
+  },
+  {
+    "symbol": "aɪ",
+    "language": "en",
+    "family": "Diphthongs",
+    "practiceGroup": "Closing Diphthongs",
+    "type": "diphthong",
+    "height": "open",
+    "backness": "front",
+    "rounding": "unrounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["a"],
+    "teachingTip": "Begin with an open mouth and glide smoothly to the short /ɪ/ sound."
+  },
+  {
+    "symbol": "ɔɪ",
+    "language": "en",
+    "family": "Diphthongs",
+    "practiceGroup": "Closing Diphthongs",
+    "type": "diphthong",
+    "height": "open-mid",
+    "backness": "back",
+    "rounding": "rounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["ɔː"],
+    "teachingTip": "Start with rounded lips for /ɔ/ and glide toward /ɪ/ while relaxing the lips."
+  },
+  {
+    "symbol": "aʊ",
+    "language": "en",
+    "family": "Diphthongs",
+    "practiceGroup": "Closing Diphthongs",
+    "type": "diphthong",
+    "height": "open",
+    "backness": "central",
+    "rounding": "unrounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["a"],
+    "teachingTip": "Start with an open mouth and glide smoothly into a rounded /ʊ/ sound."
+  },
+  {
+    "symbol": "əʊ",
+    "language": "en",
+    "family": "Diphthongs",
+    "practiceGroup": "Closing Diphthongs",
+    "type": "diphthong",
+    "height": "mid",
+    "backness": "central",
+    "rounding": "rounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["oʊ", "ɔː"],
+    "teachingTip": "Begin with a relaxed schwa and glide into a rounded /ʊ/ sound."
+  },
+  {
+    "symbol": "oʊ",
+    "language": "en",
+    "family": "Diphthongs",
+    "practiceGroup": "Closing Diphthongs",
+    "type": "diphthong",
+    "height": "close-mid",
+    "backness": "back",
+    "rounding": "rounded",
+    "length": "long",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["əʊ", "ɔː"],
+    "teachingTip": "Begin with a rounded /o/ sound and glide smoothly toward /ʊ/."
+  },
+  {
+    "symbol": "ɹ",
+    "language": "en",
+    "family": "Liquids",
+    "practiceGroup": "English R",
+    "type": "consonant",
+    "place": "alveolar",
+    "manner": "approximant",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 5
+    },
+    "commonSubstitutions": ["r", "l", "w"],
+    "teachingTip": "Curl the tip of your tongue slightly toward the roof of your mouth without touching it. Keep the airflow smooth while vibrating your vocal cords."
+  },
+  {
+    "symbol": "ɡ",
+    "language": "en",
+    "family": "Stops",
+    "practiceGroup": "English G",
+    "type": "consonant",
+    "place": "velar",
+    "manner": "stop",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 2
+    },
+    "commonSubstitutions": ["k", "g"],
+    "teachingTip": "Raise the back of your tongue to touch the soft palate, briefly stop the airflow, then release it while vibrating your vocal cords."
+  },
+  {
+    "symbol": "ɐ",
+    "language": "en",
+    "family": "Vowels",
+    "practiceGroup": "English Open Central Vowel",
+    "type": "vowel",
+    "place": "central",
+    "manner": "open",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 4
+    },
+    "commonSubstitutions": ["ʌ", "ə", "a"],
+    "teachingTip": "Relax your tongue in the center of your mouth and open your jaw slightly. Keep your lips neutral and produce a short, open vowel sound."
+  },
+  {
+    "symbol": "a",
+    "language": "en",
+    "family": "Vowels",
+    "practiceGroup": "English Open Front Vowel",
+    "type": "vowel",
+    "place": "front",
+    "manner": "open",
+    "voicing": "voiced",
+    "articulator": "tongue",
+    "airflow": "oral",
+    "difficulty": {
+      "esl": 3
+    },
+    "commonSubstitutions": ["æ", "ɑ", "ʌ"],
+    "teachingTip": "Lower your jaw and keep your tongue low and toward the front of your mouth. Keep your lips relaxed while producing a clear open vowel."
+  }
+]

@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 exports.verifyToken = (req, res, next) => {
   try {
@@ -7,28 +7,28 @@ exports.verifyToken = (req, res, next) => {
     if (!authHeader) {
       return res.status(401).json({
         success: false,
-        message: 'Access denied. No token provided.',
+        message: "Access denied. No token provided.",
       });
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.split(" ")[1];
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid token format',
+        message: "Invalid token format",
       });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.user = decoded;
-
+    console.log("Authenticated user:", req.user);
     next();
   } catch (error) {
     return res.status(401).json({
       success: false,
-      message: 'Invalid or expired token',
+      message: "Invalid or expired token",
     });
   }
 };

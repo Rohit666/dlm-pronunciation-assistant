@@ -1,60 +1,67 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from 'react';
+import { createContext, useContext, useEffect, useState } from "react";
 
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    const storedToken = localStorage.getItem("token");
 
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    const storedUser = localStorage.getItem("user");
+
+    if (storedToken && storedUser) {
+      setToken(storedToken);
+      // setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error("Invalid user in localStorage:", storedUser);
+
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+      }
     }
 
     setLoading(false);
   }, []);
 
-  const login = (userData, token) => {
-    localStorage.setItem('token', token);
+  const login = ({ user, token }) => {
+    localStorage.setItem("token", token);
 
-    localStorage.setItem(
-      'user',
-      JSON.stringify(userData)
-    );
+    localStorage.setItem("user", JSON.stringify(user));
 
-    setUser(userData);
+    setToken(token);
+
+    setUser(user);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.clear();
 
-    localStorage.removeItem('user');
+    setToken(null);
 
     setUser(null);
+
+    window.location.href = "/";
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        token,
+        loading,
         login,
         logout,
-        loading,
+        isAuthenticated: !!token,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);

@@ -1,0 +1,108 @@
+{
+  "version": "1.0",
+
+  "place": {
+    "bilabial": {
+      "bilabial": 0.0,
+      "labiodental": 0.2,
+      "dental": 0.9,
+      "alveolar": 1.0,
+      "postalveolar": 1.0,
+      "palatal": 1.0,
+      "velar": 1.0,
+      "glottal": 1.0
+    },
+
+    "labiodental": {
+      "bilabial": 0.2,
+      "labiodental": 0.0,
+      "dental": 0.4,
+      "alveolar": 0.7,
+      "postalveolar": 0.9,
+      "palatal": 1.0,
+      "velar": 1.0,
+      "glottal": 1.0
+    },
+
+    "dental": {
+      "bilabial": 0.9,
+      "labiodental": 0.4,
+      "dental": 0.0,
+      "alveolar": 0.2,
+      "postalveolar": 0.5,
+      "palatal": 0.7,
+      "velar": 0.9,
+      "glottal": 1.0
+    },
+
+    "alveolar": {
+      "bilabial": 1.0,
+      "labiodental": 0.7,
+      "dental": 0.2,
+      "alveolar": 0.0,
+      "postalveolar": 0.2,
+      "palatal": 0.5,
+      "velar": 0.8,
+      "glottal": 1.0
+    },
+
+    "postalveolar": {
+      "bilabial": 1.0,
+      "labiodental": 0.9,
+      "dental": 0.5,
+      "alveolar": 0.2,
+      "postalveolar": 0.0,
+      "palatal": 0.2,
+      "velar": 0.5,
+      "glottal": 1.0
+    },
+
+    "palatal": {
+      "bilabial": 1.0,
+      "labiodental": 1.0,
+      "dental": 0.7,
+      "alveolar": 0.5,
+      "postalveolar": 0.2,
+      "palatal": 0.0,
+      "velar": 0.3,
+      "glottal": 1.0
+    },
+
+    "velar": {
+      "bilabial": 1.0,
+      "labiodental": 1.0,
+      "dental": 0.9,
+      "alveolar": 0.8,
+      "postalveolar": 0.5,
+      "palatal": 0.3,
+      "velar": 0.0,
+      "glottal": 0.7
+    },
+
+    "glottal": {
+      "bilabial": 1.0,
+      "labiodental": 1.0,
+      "dental": 1.0,
+      "alveolar": 1.0,
+      "postalveolar": 1.0,
+      "palatal": 1.0,
+      "velar": 0.7,
+      "glottal": 0.0
+    }
+  },
+
+  "voicing": {
+    "same": 0.0,
+    "different": 1.0
+  },
+
+  "length": {
+    "same": 0.0,
+    "different": 0.4
+  },
+
+  "rounding": {
+    "same": 0.0,
+    "different": 0.3
+  }
+}
