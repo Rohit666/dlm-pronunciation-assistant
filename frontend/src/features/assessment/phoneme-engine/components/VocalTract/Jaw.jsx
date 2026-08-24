@@ -1,5 +1,5 @@
 import React from "react";
-import { JAW_TRANSFORMS } from "../../engine/animationEngine";
+import { JAW_TRANSFORMS } from "../../animationEngine";
 
 export default function Jaw({ state = "closed", children }) {
   const transform = JAW_TRANSFORMS[state] || JAW_TRANSFORMS.closed;

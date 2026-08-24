@@ -1,5 +1,5 @@
 import React from "react";
-import { VELUM_TRANSFORMS } from "../../engine/animationEngine";
+import { VELUM_TRANSFORMS } from "../../animationEngine";
 
 export default function Velum({ state = "raised", highlighted }) {
   const transform = VELUM_TRANSFORMS[state] || VELUM_TRANSFORMS.raised;

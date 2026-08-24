@@ -8,8 +8,7 @@ import Velum from "./Velum";
 import VocalFolds from "./VocalFolds";
 import Airflow from "./Airflow";
 import Labels from "./Labels";
-import { TONGUE_PATHS, interpolatePath } from "../../engine/animationEngine";
-
+import { TONGUE_PATHS, interpolatePath } from "../../animationEngine";
 export default function VocalTract({
   phoneme,
   width = 700,

@@ -1,106 +1,118 @@
-import { useState } from "react";
-import { Bot } from "lucide-react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
 
 import AssessmentCard from "../../../components/common/AssessmentCard";
-import WordSelector from "./word-analysis-components/WordSelector";
-import WordAnalysisDetails from "./word-analysis-components/WordAnalysisDetails";
-import WordAnalysisSkeleton from "./word-analysis-components/WordAnalysisSkeleton";
 
-const WordAnalysisCard = ({
-  analysis,
-  selectedWord,
-  onSelectWord,
-  selectedPhoneme,
-  onSelectPhoneme,
-}) => {
+const WordAnalysisCard = ({ analysis, selectedWord, onSelectWord }) => {
   return (
-    <AssessmentCard className="h-full w-full">
-      <h2 className="text-2xl font-bold text-gray-900">Word Analysis</h2>
+    <AssessmentCard className="w-full">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+            Word Analysis
+          </h2>
 
-      {/* Word Selector */}
-      <div className="mt-8">
-        <WordSelector
-          words={analysis}
-          selectedId={selectedWord?.id}
-          onSelect={onSelectWord}
-        />
+          <p className="mt-2 text-sm text-gray-500">
+            Select a word to explore its pronunciation.
+          </p>
+        </div>
+
+        <span
+          className="
+            hidden
+            sm:inline-flex
+            shrink-0
+            rounded-full
+            bg-gray-100
+            px-3
+            py-1.5
+            text-xs
+            font-semibold
+            text-gray-500
+          "
+        >
+          {analysis.length} words
+        </span>
       </div>
 
-      {/* Content */}
-      <div className="relative mt-8 min-h-[420px]">
-        {/* Empty State */}
-        {!selectedWord && (
-          <>
-            {/* Skeleton */}
-            <div className="opacity-40 blur-[0.8px] pointer-events-none">
-              <WordAnalysisSkeleton />
-            </div>
+      {/* Word Pills */}
+      <div className="mt-6 flex flex-wrap gap-3">
+        {analysis.map((word) => {
+          const selected = selectedWord?.id === word.id;
+          const correct = word.status === "correct";
 
-            {/* Overlay */}
-            <div
-              className="
-                absolute
-                inset-0
-                flex
+          return (
+            <button
+              key={`${word.id}-${word.index}`}
+              type="button"
+              onClick={() => onSelectWord(word)}
+              className={`
+                inline-flex
+                w-fit
+                max-w-full
                 items-center
-                justify-center
-                px-8
-              "
+                gap-2
+                rounded-2xl
+                border
+                px-4
+                py-3
+                text-left
+                transition-all
+                duration-200
+
+                ${
+                  selected
+                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-md ring-1 ring-indigo-200"
+                    : correct
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300"
+                      : "border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300"
+                }
+              `}
             >
-              <div
-                className="
-                  max-w-md
-                  rounded-3xl
-                  bg-white/90
-                  backdrop-blur-sm
-                  border
-                  border-indigo-100
-                  shadow-lg
-                  p-8
-                  text-center
-                  transition-all
-                  duration-500
-                "
+              <span className="font-semibold truncate">{word.word}</span>
+
+              <span
+                className={`
+                  text-xs
+                  font-bold
+                  shrink-0
+                  ${
+                    selected
+                      ? "text-indigo-600"
+                      : correct
+                        ? "text-emerald-600"
+                        : "text-orange-600"
+                  }
+                `}
               >
-                <div
-                  className="
-                    w-16
-                    h-16
-                    rounded-full
-                    bg-indigo-100
-                    flex
-                    items-center
-                    justify-center
-                    mx-auto
-                  "
-                >
-                  <Bot size={34} className="text-indigo-600" />
-                </div>
+                {word.score}%
+              </span>
 
-                <h3 className="mt-6 text-2xl font-bold text-gray-900">
-                  Let's improve together!
-                </h3>
+              {correct ? (
+                <CheckCircle2 size={17} className="shrink-0" />
+              ) : (
+                <AlertCircle size={17} className="shrink-0" />
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-                <p className="mt-4 text-gray-600 leading-7">
-                  Select any word above to see why it was recognised that way,
-                  discover what happened, and learn how to pronounce it more
-                  naturally.
-                </p>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Details */}
-        {selectedWord && (
-          <div
-            className="
-              animate-fadeIn
-            "
-          >
-            <WordAnalysisDetails word={selectedWord} />
-          </div>
-        )}
+      {/* Guidance */}
+      <div
+        className="
+          mt-5
+          rounded-2xl
+          border
+          border-indigo-100
+          bg-indigo-50/60
+          px-4
+          py-3
+        "
+      >
+        <p className="text-sm text-indigo-700">
+          Select a word to open detailed pronunciation analysis.
+        </p>
       </div>
     </AssessmentCard>
   );

@@ -3,12 +3,13 @@ import { Bot } from "lucide-react";
 
 const CoachHeader = ({ onListen }) => {
   return (
-    <div className="flex justify-between items-start">
-      <div className="flex gap-4">
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3 min-w-0">
         <div
           className="
-            w-16
-            h-16
+            w-12
+            h-12
+            shrink-0
             rounded-2xl
             bg-indigo-100
             flex
@@ -16,17 +17,21 @@ const CoachHeader = ({ onListen }) => {
             justify-center
           "
         >
-          <Bot size={30} className="text-indigo-600" />
+          <Bot size={24} className="text-indigo-600" />
         </div>
 
-        <div>
-          <h3 className="text-3xl font-bold">Pronunciation Coach</h3>
+        <div className="min-w-0">
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
+            Pronunciation Coach
+          </h3>
 
-          <p className="text-gray-500">Personal feedback</p>
+          <p className="mt-0.5 text-sm text-gray-500">Personal feedback</p>
         </div>
       </div>
 
-      <ListenButton onClick={onListen} />
+      <div className="shrink-0">
+        <ListenButton onClick={onListen} />
+      </div>
     </div>
   );
 };

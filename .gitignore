@@ -9,4 +9,8 @@ coverage
 backend/uploads/
 __pycache__/
 *.pyc
+*.py[cod]
 ai-runtime/.venv/ 
+/frontend/src/features/assessment/phoneme-engine/data/videos/
+/frontend/src/features/assessment/phoneme-engine/data/sounds/
+*.code-workspace

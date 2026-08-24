@@ -32,27 +32,11 @@ const WordAnalysisDetails = ({ word, selectedPhoneme, onSelectPhoneme }) => {
       `}
     >
       {/* Expected / Detected */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-xs text-gray-500">Expected</p>
 
-      <div className="grid grid-cols-2 gap-6">
-        <div
-          className="
-            rounded-2xl
-            border
-            border-emerald-200
-            bg-emerald-50
-            p-5
-          "
-        >
-          <p className="text-sm text-gray-500">Expected</p>
-
-          <p
-            className="
-              mt-3
-              text-3xl
-              font-bold
-              text-emerald-700
-            "
-          >
+          <p className="mt-2 text-2xl font-bold text-emerald-700">
             {word.expected}
           </p>
         </div>
@@ -61,7 +45,7 @@ const WordAnalysisDetails = ({ word, selectedPhoneme, onSelectPhoneme }) => {
           className={`
             rounded-2xl
             border
-            p-5
+            p-4
             ${
               word.status === "correct"
                 ? "border-emerald-200 bg-emerald-50"
@@ -69,12 +53,12 @@ const WordAnalysisDetails = ({ word, selectedPhoneme, onSelectPhoneme }) => {
             }
           `}
         >
-          <p className="text-sm text-gray-500">Detected</p>
+          <p className="text-xs text-gray-500">Detected</p>
 
           <p
             className={`
-              mt-3
-              text-3xl
+              mt-2
+              text-2xl
               font-bold
               ${word.status === "correct" ? "text-emerald-700" : "text-red-600"}
             `}
@@ -85,60 +69,36 @@ const WordAnalysisDetails = ({ word, selectedPhoneme, onSelectPhoneme }) => {
       </div>
 
       {/* Accuracy */}
-
-      <div className="mt-8">
+      <div className="mt-6">
         <AccuracyBar score={word.score} />
       </div>
 
       {/* Phoneme Comparison */}
+      <div className="mt-6">
+        <PhonemeComparison
+          comparison={word.phonemeComparison}
+          selectedPhoneme={selectedPhoneme}
+          onSelectPhoneme={onSelectPhoneme}
+        />
+      </div>
 
-      <PhonemeComparison
-        comparison={word.phonemeComparison}
-        selectedPhoneme={selectedPhoneme}
-        onSelectPhoneme={onSelectPhoneme}
-      />
-
-      {/* Assessment feedback */}
-
+      {/* Feedback */}
       {word.status === "correct" ? (
-        <div
-          className="
-            mt-8
-            rounded-2xl
-            border
-            border-emerald-200
-            bg-emerald-50
-            p-6
-          "
-        >
-          <h3
-            className="
-              text-xl
-              font-bold
-              text-emerald-700
-            "
-          >
-            Excellent!
-          </h3>
+        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+          <h3 className="text-lg font-bold text-emerald-700">Excellent!</h3>
 
-          <p
-            className="
-              mt-3
-              text-gray-700
-              leading-7
-            "
-          >
+          <p className="mt-2 text-sm text-gray-700 leading-6">
             This word was pronounced correctly. Keep maintaining this
             pronunciation.
           </p>
         </div>
       ) : (
         <>
-          <div className="mt-8">
+          <div className="mt-6">
             <IssueCard issue={word.issue} />
           </div>
 
-          <div className="mt-8">
+          <div className="mt-6">
             <RecommendationCard recommendation={word.recommendation} />
           </div>
         </>

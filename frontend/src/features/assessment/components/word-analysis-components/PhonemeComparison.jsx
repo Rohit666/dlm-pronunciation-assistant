@@ -1,5 +1,4 @@
 import { CheckCircle2, XCircle } from "lucide-react";
-
 const PhonemeComparison = ({
   comparison,
   onSelectPhoneme,
@@ -10,26 +9,28 @@ const PhonemeComparison = ({
   }
 
   return (
-    <div className="mt-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-bold text-gray-900">
-            Phoneme Comparison
-          </h3>
+    <div>
+      <div>
+        <h3 className="text-xl font-bold text-gray-900">Phoneme Comparison</h3>
 
-          <p className="mt-1 text-sm text-gray-500">
-            See how each sound in your pronunciation compares with the expected
-            sound.
-          </p>
-        </div>
+        <p className="mt-1 text-sm text-gray-500">
+          See how each sound in your pronunciation compares with the expected
+          sound.
+        </p>
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div
+        className="
+    mt-5
+    max-h-[360px]
+    overflow-y-auto
+    pr-2
+    space-y-3
+  "
+      >
         {comparison.steps.map((step) => {
           const expected = step.expected?.symbol ?? "—";
-
           const detected = step.detected?.symbol ?? "—";
-
           const matched = step.matched === true;
 
           const selectable =
@@ -64,7 +65,6 @@ const PhonemeComparison = ({
               `}
             >
               <div className="flex items-center gap-4">
-                {/* Index */}
                 <div
                   className="
                     w-8
@@ -85,7 +85,6 @@ const PhonemeComparison = ({
                   {step.index + 1}
                 </div>
 
-                {/* Expected */}
                 <div className="flex-1">
                   <p className="text-xs font-medium text-gray-500">Expected</p>
 
@@ -94,10 +93,8 @@ const PhonemeComparison = ({
                   </p>
                 </div>
 
-                {/* Arrow */}
                 <div className="text-gray-400 text-xl">→</div>
 
-                {/* Detected */}
                 <div className="flex-1">
                   <p className="text-xs font-medium text-gray-500">
                     Your sound
@@ -115,7 +112,6 @@ const PhonemeComparison = ({
                   </p>
                 </div>
 
-                {/* Result */}
                 <div className="shrink-0">
                   {matched ? (
                     <CheckCircle2 size={24} className="text-emerald-600" />

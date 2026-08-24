@@ -14,55 +14,74 @@ const AICoachCard = ({ greeting, message, focusSound, onListen }) => {
 
     return () => clearTimeout(timer);
   }, []);
+
   return (
     <AssessmentCard
       className={`
-    flex
-    flex-col
-    flex-1
-    transition-all
-    duration-700
-    ease-out
-    ${showCoach ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"}
-  `}
+        w-full
+        transition-all
+        duration-700
+        ease-out
+        ${showCoach ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}
+      `}
     >
       <div
         className={`
-    transition-all
-    duration-700
-    delay-150
-    ${showCoach ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3"}
-  `}
+          transition-all
+          duration-700
+          ${
+            showCoach ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
+          }
+        `}
       >
         <CoachHeader onListen={onListen} />
       </div>
 
       <div
-        className={`
-    transition-all
-    duration-700
-    delay-300
-    ${
-      showCoach
-        ? "opacity-100 scale-100 translate-y-0"
-        : "opacity-0 scale-95 translate-y-4"
-    }
-  `}
+        className="
+          mt-5
+          grid
+          grid-cols-1
+          lg:grid-cols-[minmax(0,1fr)_auto]
+          gap-4
+          items-center
+        "
       >
-        <CoachSpeechBubble greeting={greeting}>{message}</CoachSpeechBubble>
-      </div>
+        {/* Coach Message */}
+        <div
+          className={`
+            min-w-0
+            transition-all
+            duration-700
+            delay-200
+            ${
+              showCoach
+                ? "opacity-100 scale-100 translate-y-0"
+                : "opacity-0 scale-95 translate-y-3"
+            }
+          `}
+        >
+          <CoachSpeechBubble greeting={greeting}>{message}</CoachSpeechBubble>
+        </div>
 
-      <div
-        className={`
-    mt-auto
-    pt-8
-    transition-all
-    duration-700
-    delay-500
-    ${showCoach ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}
-  `}
-      >
-        <FocusSoundPill sound={focusSound} />
+        {/* Focus Sound */}
+        {focusSound && (
+          <div
+            className={`
+              shrink-0
+              transition-all
+              duration-700
+              delay-400
+              ${
+                showCoach
+                  ? "opacity-100 translate-y-0"
+                  : "opacity-0 translate-y-3"
+              }
+            `}
+          >
+            <FocusSoundPill sound={focusSound} />
+          </div>
+        )}
       </div>
     </AssessmentCard>
   );

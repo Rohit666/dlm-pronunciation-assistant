@@ -11,11 +11,15 @@ const SentenceText = ({
   useEffect(() => {
     setVisibleWords([]);
 
-    words.forEach((_, index) => {
+    const timers = words.map((_, index) =>
       setTimeout(() => {
         setVisibleWords((prev) => [...prev, index]);
-      }, index * 180);
-    });
+      }, index * 120),
+    );
+
+    return () => {
+      timers.forEach(clearTimeout);
+    };
   }, [words]);
 
   const incorrectClass =
@@ -26,15 +30,18 @@ const SentenceText = ({
       className="
         flex
         flex-wrap
-        gap-3
-        text-[30px]
+        gap-x-2.5
+        gap-y-2
+        text-2xl
+        sm:text-3xl
         font-bold
-        leading-tight
+        leading-snug
+        break-words
       "
     >
       {words.map((word, index) => (
         <span
-          key={index}
+          key={`${word.id ?? word.word}-${index}`}
           onClick={() =>
             clickable && word.status === "incorrect" && onWordClick?.(word.id)
           }
@@ -46,13 +53,15 @@ const SentenceText = ({
             ${
               visibleWords.includes(index)
                 ? "opacity-100 translate-y-0"
-                : "opacity-0 translate-y-3"
+                : "opacity-0 translate-y-2"
             }
 
+            ${word.status === "incorrect" ? incorrectClass : "text-gray-900"}
+
             ${
-              word.status === "incorrect"
-                ? `${incorrectClass} `
-                : "text-gray-900"
+              clickable && word.status === "incorrect"
+                ? "cursor-pointer hover:opacity-75"
+                : ""
             }
           `}
         >

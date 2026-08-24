@@ -1,4 +1,4 @@
-from fastapi import FastAPI # type: ignore[import]
+from fastapi import FastAPI
 from app.api.routes.speech import router as speech_router
 from app.api.routes.health import router as health_router
 from app.api.routes.pronunciation import router as pronunciation_router

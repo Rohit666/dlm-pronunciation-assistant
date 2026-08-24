@@ -69,12 +69,12 @@ const PronunciationSkeleton = () => {
             <Mic2 size={40} className="mx-auto text-indigo-500" />
 
             <h3 className="mt-5 text-xl font-bold text-gray-900">
-              Select a word
+              Select a phoneme
             </h3>
 
             <p className="mt-3 text-gray-600 leading-7">
-              Click any word in the Word Analysis card to view pronunciation
-              guidance, mouth animation, practice words and audio.
+              Click any phoneme in the Phoneme Analysis card to view
+              pronunciation guidance, mouth animation, practice words and audio.
             </p>
           </div>
         </div>

@@ -9,6 +9,7 @@ import {
 import { ROUTES } from "../../../constants/routes";
 
 const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
+  const navigate = useNavigate();
   /*
    * UI Stage
    */

@@ -12,6 +12,7 @@ import PronunciationAssessment from "../../features/assessment/layouts/SuccessAs
 import usePracticePlayer from "../../features/practice/hooks/usePracticePlayer";
 import { adaptAssessment } from "../../features/assessment/adapter/assessmentAdapter";
 import { getPracticeAttempt } from "../../services/practiceAttemptService";
+import { ROUTES } from "../../constants/routes";
 function LessonPracticePlayer() {
   const navigate = useNavigate();
   const {
@@ -463,21 +464,19 @@ duration-300   hover:bg-yellow-500  cursor-pointer disabled:opacity-50
       )}
 
       <div className="flex justify-between mt-8">
-        <button
-          className="px-6 py-3 border rounded-xl"
+        <SecondaryButton
           disabled={currentIndex === 0}
           onClick={() => setCurrentIndex(currentIndex - 1)}
         >
           Previous
-        </button>
+        </SecondaryButton>
 
-        <button
-          className="px-6 py-3 bg-indigo-600 text-white rounded-xl"
+        <PrimaryButton
           disabled={currentIndex === sentences.length - 1}
           onClick={() => setCurrentIndex(currentIndex + 1)}
         >
           Next
-        </button>
+        </PrimaryButton>
       </div>
     </div>
   );

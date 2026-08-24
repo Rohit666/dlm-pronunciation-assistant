@@ -184,67 +184,63 @@ const adaptWordAnalysis = (result) => {
     feedbackMap.set(feedback.word.toLowerCase(), feedback);
   });
 
-  return (result.assessment_document.words ?? []).map((backendWord, index) => {
-    const feedback = feedbackMap.get(backendWord.word.toLowerCase()) ?? {};
+  return (result.assessment_document.words ?? [])
+    .filter((backendWord) => backendWord.operation !== "insertion")
+    .map((backendWord, index) => {
+      const feedback = feedbackMap.get(backendWord.word.toLowerCase()) ?? {};
 
-    const accuracy = backendWord.accuracy ?? 0;
+      const accuracy = backendWord.accuracy ?? 0;
 
-    const weakPhonemes = backendWord.weak_phonemes ?? [];
+      const weakPhonemes = backendWord.weak_phonemes ?? [];
 
-    const phonemeComparison =
-      backendWord.pronunciation?.phoneme_comparison ?? null;
+      const phonemeComparison =
+        backendWord.pronunciation?.phoneme_comparison ?? null;
 
-    return {
-      // ---------- UI ----------
-      id: backendWord.word.toLowerCase(),
-      index,
+      return {
+        id: backendWord.word.toLowerCase(),
+        index,
 
-      word: backendWord.word,
+        word: backendWord.word,
+        expected: backendWord.word,
 
-      expected: backendWord.word,
+        detected: backendWord.student_word ?? null,
+        detectedLabel: backendWord.student_word ?? "Not detected",
 
-      detected: backendWord.student_word ?? null,
+        score: Math.round(accuracy),
 
-      detectedLabel: backendWord.student_word ?? "Not detected",
+        status: accuracy >= 95 ? "correct" : "incorrect",
 
-      score: Math.round(accuracy),
+        issue:
+          feedback.issue ??
+          (backendWord.student_word
+            ? `"${backendWord.word}" was recognised as "${backendWord.student_word}".`
+            : `"${backendWord.word}" was not detected in your recording.`),
 
-      status: accuracy >= 95 ? "correct" : "incorrect",
+        recommendation:
+          feedback.recommendation ?? feedback.messages?.join(" ") ?? "",
 
-      issue:
-        feedback.issue ??
-        (backendWord.student_word
-          ? `"${backendWord.word}" was recognised as "${backendWord.student_word}".`
-          : `"${backendWord.word}" was not detected in your recording.`),
+        accuracy,
 
-      recommendation:
-        feedback.recommendation ?? feedback.messages?.join(" ") ?? "",
+        operation: backendWord.operation,
 
-      // ---------- Speech Analysis ----------
-      accuracy,
+        weakPhonemes,
 
-      operation: backendWord.operation,
+        phoneme: weakPhonemes[0] ?? null,
 
-      weakPhonemes,
+        changedFeatures: feedback.changed_features ?? [],
 
-      phoneme: weakPhonemes[0] ?? null,
+        phonemeComparisons: feedback.phoneme_comparisons ?? [],
 
-      changedFeatures: feedback.changed_features ?? [],
+        practiceWords: feedback.practice_words ?? [],
 
-      phonemeComparisons: feedback.phoneme_comparisons ?? [],
+        phonemeComparison,
 
-      practiceWords: feedback.practice_words ?? [],
-
-      // NEW
-      phonemeComparison,
-
-      // ---------- Preserve backend ----------
-      backend: {
-        ...backendWord,
-        feedback,
-      },
-    };
-  });
+        backend: {
+          ...backendWord,
+          feedback,
+        },
+      };
+    });
 };
 
 const adaptCoach = (result) => {

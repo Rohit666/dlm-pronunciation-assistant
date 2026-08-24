@@ -1,5 +1,5 @@
 import React from "react";
-import { LIP_TRANSFORMS } from "../../engine/animationEngine";
+import { LIP_TRANSFORMS } from "../../animationEngine";
 
 export default function Lips({ state = "slightly_open", highlighted }) {
   const upperTransform =
