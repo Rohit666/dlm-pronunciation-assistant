@@ -11,6 +11,10 @@ module.exports = (sequelize, DataTypes) => {
       lesson_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
+        references: {
+          model: "lessons",
+          key: "id",
+        },
       },
 
       sentence_order: {

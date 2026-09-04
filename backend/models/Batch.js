@@ -20,6 +20,10 @@ module.exports = (sequelize, DataTypes) => {
       mentor_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
+        references: {
+          model: "users",
+          key: "id",
+        },
       },
     },
     {

@@ -27,19 +27,26 @@ module.exports = (sequelize, DataTypes) => {
 
       created_by: {
         type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: "users",
+          key: "id",
+        },
       },
       lesson_status: {
         type: DataTypes.ENUM("draft", "published", "archived"),
 
         defaultValue: "draft",
       },
+      // DB column is varchar(50), was unbounded STRING before.
       lesson_type: {
-        type: DataTypes.STRING,
+        type: DataTypes.STRING(50),
         defaultValue: "sentence_practice",
       },
 
+      // DB column is varchar(20), was unbounded STRING before.
       difficulty_level: {
-        type: DataTypes.STRING,
+        type: DataTypes.STRING(20),
         defaultValue: "beginner",
       },
 
