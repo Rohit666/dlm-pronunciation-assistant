@@ -4,6 +4,9 @@ import PageHeader from "../../components/PageHeader";
 import Loader from "../../components/Loader";
 import CardGrid from "../../components/cards/CardGrid";
 import EntityCard from "../../components/cards/EntityCard";
+import PhonemeHeatmap from "../../components/analytics/PhonemeHeatmap";
+import StudentTierBoard from "../../components/analytics/StudentTierBoard";
+import AttemptTrajectoryMetrics from "../../components/analytics/AttemptTrajectoryMetrics";
 import {
   getWeakStudents,
   getInactiveStudents,
@@ -11,6 +14,11 @@ import {
   getWeakOutcomes,
   getMostImprovedStudents,
 } from "../../services/analyticsService";
+import {
+  getPhonemeHeatmap,
+  getStudentTiers,
+  getAttemptTrajectoryMetrics,
+} from "../../services/mentorInsightsService";
 import { formatDate } from "../../utils/dateUtils";
 import OUTCOME_LABELS from "../../constants/outcomeLabels";
 function AnalyticsPage() {
@@ -20,9 +28,37 @@ function AnalyticsPage() {
   const [lessonEffectiveness, setLessonEffectiveness] = useState([]);
   const [weakOutcomes, setWeakOutcomes] = useState([]);
   const [improvedStudents, setImprovedStudents] = useState([]);
+
+  // Class-wide phoneme heatmap, student tiering, attempt-to-mastery
+  // metrics. Backed by mock data for now (see
+  // services/mentorInsightsService.js) — kept in a separate effect so
+  // a failure here never blocks the real analytics sections below.
+  const [phonemeHeatmap, setPhonemeHeatmap] = useState(null);
+  const [studentTiers, setStudentTiers] = useState(null);
+  const [trajectoryMetrics, setTrajectoryMetrics] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(true);
+
   useEffect(() => {
     loadAnalytics();
+    loadInsights();
   }, []);
+
+  const loadInsights = async () => {
+    try {
+      const [heatmapData, tierData, trajectoryData] = await Promise.all([
+        getPhonemeHeatmap(),
+        getStudentTiers(),
+        getAttemptTrajectoryMetrics(),
+      ]);
+      setPhonemeHeatmap(heatmapData);
+      setStudentTiers(tierData);
+      setTrajectoryMetrics(trajectoryData);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
 
   const loadAnalytics = async () => {
     try {
@@ -57,6 +93,14 @@ function AnalyticsPage() {
         title="Analytics"
         description="Student performance insights"
       />
+
+      {!insightsLoading && (
+        <div className="space-y-6 mb-12">
+          <PhonemeHeatmap data={phonemeHeatmap} />
+          <StudentTierBoard tiers={studentTiers} />
+          <AttemptTrajectoryMetrics metrics={trajectoryMetrics} />
+        </div>
+      )}
 
       {loading ? (
         <Loader />

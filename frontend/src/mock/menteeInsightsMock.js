@@ -46,7 +46,8 @@ export const MOCK_LESSON_CATALOG = [
   {
     id: 103,
     title: "V and W: The Lip Test",
-    description: "Feel the difference between a lip-bite /v/ and a rounded /w/.",
+    description:
+      "Feel the difference between a lip-bite /v/ and a rounded /w/.",
     thumbnail: null,
     cefrLevel: "B1",
     targetPhonemes: ["v", "w"],
@@ -139,12 +140,42 @@ export const MOCK_LESSON_CATALOG = [
 export const MOCK_WATCHLIST_LESSON_IDS = [103, 107, 110];
 
 export const MOCK_CEFR_MILESTONES = [
-  { level: "A1", status: "achieved", accuracyAtCompletion: 91, dateAchieved: "2026-06-14" },
-  { level: "A2", status: "achieved", accuracyAtCompletion: 86, dateAchieved: "2026-07-22" },
-  { level: "B1", status: "current", accuracyAtCompletion: null, dateAchieved: null },
-  { level: "B2", status: "locked", accuracyAtCompletion: null, dateAchieved: null },
-  { level: "C1", status: "locked", accuracyAtCompletion: null, dateAchieved: null },
-  { level: "C2", status: "locked", accuracyAtCompletion: null, dateAchieved: null },
+  {
+    level: "A1",
+    status: "achieved",
+    accuracyAtCompletion: 91,
+    dateAchieved: "2026-06-14",
+  },
+  {
+    level: "A2",
+    status: "achieved",
+    accuracyAtCompletion: 86,
+    dateAchieved: "2026-07-22",
+  },
+  {
+    level: "B1",
+    status: "current",
+    accuracyAtCompletion: null,
+    dateAchieved: null,
+  },
+  {
+    level: "B2",
+    status: "locked",
+    accuracyAtCompletion: null,
+    dateAchieved: null,
+  },
+  {
+    level: "C1",
+    status: "locked",
+    accuracyAtCompletion: null,
+    dateAchieved: null,
+  },
+  {
+    level: "C2",
+    status: "locked",
+    accuracyAtCompletion: null,
+    dateAchieved: null,
+  },
 ];
 
 export const MOCK_SCORE_OVERVIEW = {
