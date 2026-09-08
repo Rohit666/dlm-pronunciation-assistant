@@ -99,6 +99,19 @@ async function ensureTryPersisted({
     transaction,
   });
 
+  // lastTry is always the session's current peak — only strictly
+  // improving tries ever get persisted (Progressive Filter Rule), so
+  // try_number and overall_score rise together and the highest
+  // try_number IS the highest score. If the submitted score exactly
+  // matches that peak (a tie, e.g. Try 5 re-hits Try 1's 92% and Try 1
+  // is still the last persisted row), it's already represented —
+  // inserting again would duplicate the same score under a new
+  // try_number. Only a genuine unpersisted regression (submitted score
+  // below the peak) needs its own row.
+  if (lastTry && Number(lastTry.overall_score) === Number(overallScore)) {
+    return;
+  }
+
   await PracticeSessionTry.create(
     {
       practice_session_id: practiceSessionId,

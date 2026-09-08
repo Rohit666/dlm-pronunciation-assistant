@@ -2,25 +2,41 @@ import { useSortable } from "@dnd-kit/sortable";
 
 import { CSS } from "@dnd-kit/utilities";
 
+import DOMPurify from "dompurify";
 import { GripVertical, Pencil, Trash2 } from "lucide-react";
 import { API_BASE_URL } from "../constants/api";
 import { blocksFromSentence } from "../utils/sentenceBlocks";
+
+// Same allowlist as RichTextEditor.jsx / backend/utils/sentenceBlocks.js
+// — block.text is already sanitized server-side before it's ever
+// stored, this is a defense-in-depth re-sanitize at render time.
+const ALLOWED_TAGS = [
+  "p", "br", "strong", "em", "s", "code",
+  "ul", "ol", "li", "blockquote",
+  "h1", "h2", "h3", "hr",
+];
+
+function sanitize(html) {
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR: [] });
+}
 
 // Renders one block's text + its own attachments only — never the
 // legacy flat sentence_text/audio_path/image_path/video_path, which
 // only ever mirror the main_text block and would silently hide
 // sub-text blocks and misattribute their media to "the sentence" as a
-// whole (the bug this component previously had).
-function BlockPreview({ block, index }) {
+// whole (the bug this component previously had). No "Main Text" /
+// "Sub-Text N" badge — that administrative labeling stays inside the
+// SentenceBlockBuilder drawer where mentors are editing; the final
+// display view renders content cleanly instead.
+function BlockPreview({ block }) {
   const hasAttachments = block.attachments.length > 0;
 
   return (
     <div className="border border-gray-100 rounded-2xl p-4">
-      <span className="inline-block px-2.5 py-0.5 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-700 mb-2">
-        {block.type === "main_text" ? "Main Text" : `Sub-Text ${index}`}
-      </span>
-
-      <p className="text-gray-800 leading-7">{block.text}</p>
+      <div
+        className="text-gray-800 leading-7 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-gray-500 [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:rounded [&_code]:font-mono [&_code]:text-sm [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:text-base [&_h3]:font-bold"
+        dangerouslySetInnerHTML={{ __html: sanitize(block.text) }}
+      />
 
       {hasAttachments && (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -74,7 +90,6 @@ function SortableSentenceCard({ sentence, onEdit, onDelete }) {
   };
 
   const blocks = blocksFromSentence(sentence, API_BASE_URL);
-  let subTextCounter = 0;
 
   return (
     <div
@@ -121,16 +136,9 @@ function SortableSentenceCard({ sentence, onEdit, onDelete }) {
               attachments — main text, then every sub-text block in
               order. */}
           <div className="space-y-3">
-            {blocks.map((block) => {
-              if (block.type === "sub_text") subTextCounter += 1;
-              return (
-                <BlockPreview
-                  key={block.id}
-                  block={block}
-                  index={subTextCounter}
-                />
-              );
-            })}
+            {blocks.map((block) => (
+              <BlockPreview key={block.id} block={block} />
+            ))}
           </div>
         </div>
       </div>

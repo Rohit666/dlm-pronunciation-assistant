@@ -11,11 +11,35 @@
 //   ...
 // ]
 
+const sanitizeHtml = require("sanitize-html");
+
 const ATTACHMENT_TYPES = ["audio", "image", "video"];
 const BLOCK_TYPES = ["main_text", "sub_text"];
 
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// Server-side sanitize choke point for block.text (now rich HTML from
+// the Tiptap editor, not plain text). Allowlist mirrors exactly what
+// @tiptap/starter-kit can produce — nothing else gets through. This is
+// the authority: the frontend also sanitizes with DOMPurify before it
+// ever calls this API, but that's defense in depth, not the guarantee —
+// a direct API call bypasses the browser entirely, and this text is
+// later rendered via dangerouslySetInnerHTML to OTHER users
+// (mentees viewing the sentence), so unsanitized input here is a stored
+// XSS vector regardless of what the client already did.
+const TEXT_SANITIZE_OPTIONS = {
+  allowedTags: [
+    "p", "br", "strong", "em", "s", "code",
+    "ul", "ol", "li", "blockquote",
+    "h1", "h2", "h3", "hr",
+  ],
+  allowedAttributes: {},
+};
+
+function sanitizeBlockText(text) {
+  return sanitizeHtml(text, TEXT_SANITIZE_OPTIONS);
 }
 
 // Validates + normalizes a client-submitted content_blocks payload
@@ -62,7 +86,7 @@ function normalizeContentBlocks(rawBlocks) {
       return {
         id: block.id ? String(block.id) : `block-${index}`,
         type: block.type,
-        text: typeof block.text === "string" ? block.text : "",
+        text: sanitizeBlockText(typeof block.text === "string" ? block.text : ""),
         order: Number.isFinite(block.order) ? block.order : index + 1,
         attachments,
       };

@@ -11,6 +11,11 @@ const base = {
   port: process.env.DB_PORT,
   dialect: "mysql",
   logging: false,
+  // Must match config/db.js's timezone exactly — this is the value
+  // migrations (run via sequelize-cli, which reads this file, not
+  // db.js) connect with. A mismatch between the two would reintroduce
+  // the same drift this fix is closing.
+  timezone: "+00:00",
 };
 
 module.exports = {

@@ -1,5 +1,6 @@
 import { ArrowUp, ArrowDown, Trash2, Mic, Image as ImageIcon, Video, Plus } from "lucide-react";
 import { createEmptyBlock } from "../../utils/sentenceBlocks";
+import RichTextEditor from "./RichTextEditor";
 
 const ATTACHMENT_CONFIG = [
   { type: "audio", label: "Audio", accept: "audio/*", icon: Mic },
@@ -114,13 +115,12 @@ function BlockCard({ block, index, isFirst, isLast, canRemove, canReorder, onCha
         </div>
       </div>
 
-      <textarea
-        rows={block.type === "main_text" ? 3 : 2}
-        value={block.text}
-        placeholder={block.type === "main_text" ? "Main sentence text" : "Sub-text content"}
-        onChange={(e) => onChange({ ...block, text: e.target.value })}
-        className="w-full border rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-      />
+      <div className="mb-3">
+        <RichTextEditor
+          value={block.text}
+          onChange={(html) => onChange({ ...block, text: html })}
+        />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {ATTACHMENT_CONFIG.map((config) => (
