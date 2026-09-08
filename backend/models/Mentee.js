@@ -11,19 +11,11 @@ module.exports = (sequelize, DataTypes) => {
       user_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: {
-          model: "users",
-          key: "id",
-        },
       },
 
       batch_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        references: {
-          model: "batches",
-          key: "id",
-        },
       },
 
       roll_number: {
@@ -48,6 +40,9 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "mentee_id",
     });
     Mentee.hasMany(models.PracticeAttempt, {
+      foreignKey: "mentee_id",
+    });
+    Mentee.hasMany(models.StudentPhonemeStat, {
       foreignKey: "mentee_id",
     });
   };

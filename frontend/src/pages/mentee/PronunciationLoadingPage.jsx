@@ -17,6 +17,7 @@ const PronunciationLoadingPage = () => {
     sentences,
     currentIndex,
     setAssessment,
+    setAssessmentToken,
     setStage,
   } = usePracticePlayer();
 
@@ -57,6 +58,7 @@ const PronunciationLoadingPage = () => {
         const adaptedAssessment = adaptAssessment(response.result);
 
         setAssessment(adaptedAssessment);
+        setAssessmentToken(response.assessment_token);
 
         setCurrentStep(steps.length - 1);
 
@@ -69,7 +71,14 @@ const PronunciationLoadingPage = () => {
     };
 
     processAssessment();
-  }, [audioBlob, currentSentence, attemptId, setAssessment, setStage]);
+  }, [
+    audioBlob,
+    currentSentence,
+    attemptId,
+    setAssessment,
+    setAssessmentToken,
+    setStage,
+  ]);
   /*
    * --------------------------------------------------
    * Loading animation

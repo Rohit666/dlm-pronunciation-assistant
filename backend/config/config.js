@@ -1,5 +1,6 @@
-// sequelize-cli config (JS, not JSON, so it can read .env like config/db.js does).
-// .sequelizerc points here. Drop this in backend/config/config.js.
+// Sequelize-CLI config (plain object — CLI cannot consume config/db.js,
+// which exports an already-instantiated Sequelize instance). Same env
+// vars as config/db.js so both stay in sync from one .env file.
 require("dotenv").config();
 
 const base = {

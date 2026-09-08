@@ -11,10 +11,6 @@ module.exports = (sequelize, DataTypes) => {
       lesson_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: {
-          model: "lessons",
-          key: "id",
-        },
       },
 
       sentence_order: {
@@ -37,6 +33,19 @@ module.exports = (sequelize, DataTypes) => {
 
       video_path: {
         type: DataTypes.STRING(255),
+      },
+
+      // Modular block hierarchy (main_text / sub_text + attachments).
+      // See utils/sentenceBlocks.js (backend) for shape validation and
+      // frontend/src/utils/sentenceBlocks.js for the mirrored client
+      // shape. Legacy sentence_text/audio_path/image_path/video_path
+      // above are kept in sync with the main_text block by
+      // lessonSentenceController so old readers (practiceController
+      // .compare uses sentence_text as the AI reference text) keep
+      // working.
+      content_blocks: {
+        type: DataTypes.JSON,
+        allowNull: true,
       },
     },
     {

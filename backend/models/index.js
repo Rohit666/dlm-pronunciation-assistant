@@ -19,6 +19,22 @@ db.PracticeAttempt = require("./PracticeAttempt")(
   sequelize,
   Sequelize.DataTypes,
 );
+db.StudentPhonemeStat = require("./StudentPhonemeStat")(
+  sequelize,
+  Sequelize.DataTypes,
+);
+db.Assessment = require("./Assessment")(sequelize, Sequelize.DataTypes);
+db.WordAssessment = require("./WordAssessment")(sequelize, Sequelize.DataTypes);
+db.PhonemeAssessment = require("./PhonemeAssessment")(
+  sequelize,
+  Sequelize.DataTypes,
+);
+db.Diagnosis = require("./Diagnosis")(sequelize, Sequelize.DataTypes);
+db.LearningNeed = require("./LearningNeed")(sequelize, Sequelize.DataTypes);
+db.AssessmentSnapshot = require("./AssessmentSnapshot")(
+  sequelize,
+  Sequelize.DataTypes,
+);
 // Run associations
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {

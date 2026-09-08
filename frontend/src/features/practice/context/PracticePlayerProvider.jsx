@@ -42,6 +42,11 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
 
   const [assessment, setAssessment] = useState(null);
 
+  // One-time token from /practice/compare, redeemed by /practice
+  // (submitPractice) to persist that exact evaluation as the accepted
+  // submission. Cleared after use so a stale token is never resent.
+  const [assessmentToken, setAssessmentToken] = useState(null);
+
   /*
    * Loading
    */
@@ -53,6 +58,7 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
   const retryRecording = () => {
     setAudioBlob(null);
     setAssessment(null);
+    setAssessmentToken(null);
     setError(null);
     setStage("recording");
   };
@@ -68,7 +74,7 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
       await submitPractice({
         lessonSentenceId: currentSentence.id,
         practiceAttemptId: attemptId,
-        audioBlob,
+        assessmentToken,
       });
 
       const isLastSentence = currentIndex === sentences.length - 1;
@@ -93,6 +99,7 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
       setCurrentIndex((previous) => previous + 1);
 
       setAssessment(null);
+      setAssessmentToken(null);
       setAudioBlob(null);
       setStage("recording");
     } catch (error) {
@@ -142,6 +149,9 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
 
     assessment,
     setAssessment,
+
+    assessmentToken,
+    setAssessmentToken,
 
     /*
      * Loading

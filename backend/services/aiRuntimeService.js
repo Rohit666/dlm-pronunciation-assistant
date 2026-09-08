@@ -3,13 +3,12 @@ const aiRuntime = axios.create({
   baseURL: process.env.AI_RUNTIME_URL,
   timeout: 120000,
 });
-const { LessonSentence, PracticeAttempt } = require("../models");
-const path = require("path");
 
 const health = async () => {
   const response = await aiRuntime.get("/health");
   return response.data;
 };
+
 const transcribe = async (audioPath, language = "en") => {
   const response = await aiRuntime.post("/speech/transcribe", {
     audioPath,
@@ -18,24 +17,24 @@ const transcribe = async (audioPath, language = "en") => {
 
   return response.data;
 };
-const compare = async (req) => {
-  const { lessonSentenceId, practiceAttemptId } = req.body;
-  const audioPath = path.resolve(req.file.path);
-  const lessonSentence = await LessonSentence.findByPk(lessonSentenceId);
-  if (!lessonSentence) {
-    throw new Error("Lesson sentence not found.");
-  }
-  const payload = {
+
+// Pure passthrough to the Python AI runtime — no persistence, no
+// lookups. Orchestration (lesson sentence lookup, mentee lookup,
+// caching the result behind an assessment_token) lives in
+// practiceController.compare, which is the transient half of the
+// Transient Compare vs. Permanent Submit split.
+const assess = async ({ audioPath, referenceText, language = "en" }) => {
+  const response = await aiRuntime.post("/practice/assess", {
     audio_path: audioPath,
-    reference_text: lessonSentence.sentence_text,
-    language: "en",
-  };
-  const response = await aiRuntime.post("/practice/assess", payload);
+    reference_text: referenceText,
+    language,
+  });
+
   return response.data;
 };
 
 module.exports = {
   health,
   transcribe,
-  compare,
+  assess,
 };

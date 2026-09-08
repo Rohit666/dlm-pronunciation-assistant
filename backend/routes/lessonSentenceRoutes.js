@@ -20,20 +20,12 @@ router.post(
   "/:lessonId",
   verifyToken,
   allowRoles("admin", "mentor"),
-  upload.fields([
-    {
-      name: "sentence_audio",
-      maxCount: 1,
-    },
-    {
-      name: "sentence_image",
-      maxCount: 1,
-    },
-    {
-      name: "sentence_video",
-      maxCount: 1,
-    },
-  ]),
+  // Block count is dynamic (Part 1 content builder) — files arrive as
+  // block_<blockIndex>_attachment_<attachmentIndex>, so a fixed
+  // upload.fields([...]) list no longer works. upload.any() accepts
+  // arbitrary field names; the controller maps req.files back onto
+  // content_blocks by fieldname.
+  upload.any(),
   lessonSentenceController.createSentence,
 );
 
@@ -53,20 +45,7 @@ router.put(
   "/:id",
   verifyToken,
   allowRoles("mentor"),
-  upload.fields([
-    {
-      name: "audio",
-      maxCount: 1,
-    },
-    {
-      name: "image",
-      maxCount: 1,
-    },
-    {
-      name: "video",
-      maxCount: 1,
-    },
-  ]),
+  upload.any(),
   lessonSentenceController.updateSentence,
 );
 module.exports = router;

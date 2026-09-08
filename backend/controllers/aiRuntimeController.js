@@ -1,5 +1,4 @@
 const aiRuntimeService = require("../services/aiRuntimeService");
-const fs = require("fs");
 
 exports.health = async (req, res) => {
   try {
@@ -41,27 +40,7 @@ exports.transcribe = async (req, res) => {
   }
 };
 
-exports.compare = async (req, res) => {
-  try {
-    const result = await aiRuntimeService.compare(req);
-
-    res.json({
-      success: true,
-      result,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to compare recording.",
-    });
-  } finally {
-    try {
-      if (req.file) {
-        // await fs.promises.unlink(req.file.path);
-      }
-    } catch (error) {
-      console.warn("Unable to delete temporary comparison recording.", error);
-    }
-  }
-};
+// compare() moved to practiceController.compare (POST /api/practice/compare)
+// as part of the Transient Compare vs. Permanent Submit rearchitecture —
+// it now needs the mentee lookup + assessment_token caching that belong
+// with the practice flow, not the ai-runtime passthrough.

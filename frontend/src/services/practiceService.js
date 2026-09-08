@@ -1,24 +1,25 @@
 import api from "./api";
 
+// Permanent submit. No file upload — the recording was already sent to
+// /practice/compare; this redeems the cached assessment_token (if any)
+// into the accepted, permanently-persisted submission.
 export const submitPractice = async ({
   lessonSentenceId,
   practiceAttemptId,
-  audioBlob,
+  assessmentToken,
 }) => {
-  const formData = new FormData();
-
-  formData.append("lesson_sentence_id", lessonSentenceId);
-  formData.append("practice_attempt_id", practiceAttemptId);
-  formData.append("recording", audioBlob, `practice-${Date.now()}.webm`);
-
-  const response = await api.post("/practice", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+  const response = await api.post("/practice", {
+    lesson_sentence_id: lessonSentenceId,
+    practice_attempt_id: practiceAttemptId,
+    assessment_token: assessmentToken,
   });
 
   return response.data;
 };
+
+// Transient compare. Never persisted server-side beyond the short-lived
+// assessment_token cache — returns the AI evaluation plus that token so
+// a later submitPractice() call can redeem it.
 export const comparePractice = async ({
   lessonSentenceId,
   practiceAttemptId,
@@ -29,7 +30,7 @@ export const comparePractice = async ({
   formData.append("practiceAttemptId", practiceAttemptId);
   formData.append("recording", audioBlob, `practice-${Date.now()}.webm`);
 
-  const response = await api.post("/ai-runtime/compare", formData, {
+  const response = await api.post("/practice/compare", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },

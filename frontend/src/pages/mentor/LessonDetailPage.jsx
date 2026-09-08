@@ -27,8 +27,12 @@ import PageHeader from "../../components/PageHeader";
 import ConfirmModal from "../../components/ConfirmModal";
 import DataTable from "../../components/DataTable";
 import FormInput from "../../components/forms/FormInput";
-import FormFileInput from "../../components/forms/FormFileInput";
-import FormTextarea from "../../components/forms/FormTextarea";
+import SentenceBlockBuilder from "../../components/mentor/SentenceBlockBuilder";
+import {
+  defaultBlocks,
+  blocksFromSentence,
+  appendBlocksToFormData,
+} from "../../utils/sentenceBlocks";
 import { API_BASE_URL } from "../../constants/api";
 
 function LessonDetailPage() {
@@ -44,16 +48,12 @@ function LessonDetailPage() {
 
   const [selectedSentence, setSelectedSentence] = useState(null);
   const [editModal, setEditModal] = useState(false);
-  const [editImagePreview, setEditImagePreview] = useState("");
 
-  const [editAudioPreview, setEditAudioPreview] = useState("");
-
-  const [editVideoPreview, setEditVideoPreview] = useState("");
-  const [removeImage, setRemoveImage] = useState(false);
-
-  const [removeAudio, setRemoveAudio] = useState(false);
-
-  const [removeVideo, setRemoveVideo] = useState(false);
+  // Part 1 — modular block-based content builder state. The "Add
+  // Sentence" panel and "Edit Sentence" modal each own their own block
+  // list; SentenceBlockBuilder is a controlled component.
+  const [newBlocks, setNewBlocks] = useState(defaultBlocks());
+  const [editBlocks, setEditBlocks] = useState(defaultBlocks());
 
   const {
     register,
@@ -91,18 +91,7 @@ function LessonDetailPage() {
 
       formData.append("sentence_order", data.sentence_order);
 
-      formData.append("sentence_text", data.sentence_text);
-
-      if (data.sentence_audio?.[0]) {
-        formData.append("sentence_audio", data.sentence_audio[0]);
-      }
-      if (data.sentence_image?.[0]) {
-        formData.append("sentence_image", data.sentence_image[0]);
-      }
-
-      if (data.sentence_video?.[0]) {
-        formData.append("sentence_video", data.sentence_video[0]);
-      }
+      appendBlocksToFormData(formData, newBlocks);
 
       await api.post(`/lesson-sentences/${lessonId}`, formData, {
         headers: {
@@ -113,6 +102,7 @@ function LessonDetailPage() {
       toast.success("Sentence added successfully");
 
       reset();
+      setNewBlocks(defaultBlocks());
 
       fetchSentences();
     } catch (error) {
@@ -141,53 +131,20 @@ function LessonDetailPage() {
     setSelectedSentence(sentence);
 
     resetEditForm({
-      sentence_text: sentence.sentence_text,
-
       sentence_order: sentence.sentence_order,
     });
 
-    setEditImagePreview(
-      sentence.image_path ? `${API_BASE_URL}/${sentence.image_path}` : "",
-    );
+    setEditBlocks(blocksFromSentence(sentence, API_BASE_URL));
 
-    setEditAudioPreview(
-      sentence.audio_path ? `${API_BASE_URL}/${sentence.audio_path}` : "",
-    );
-
-    setEditVideoPreview(
-      sentence.video_path ? `${API_BASE_URL}/${sentence.video_path}` : "",
-    );
-    setRemoveImage(false);
-
-    setRemoveAudio(false);
-
-    setRemoveVideo(false);
     setEditModal(true);
   };
   const onEditSubmit = async (data) => {
     try {
       const formData = new FormData();
 
-      formData.append("sentence_text", data.sentence_text);
-
       formData.append("sentence_order", data.sentence_order);
 
-      if (data.audio?.[0]) {
-        formData.append("audio", data.audio[0]);
-      }
-
-      if (data.image?.[0]) {
-        formData.append("image", data.image[0]);
-      }
-
-      if (data.video?.[0]) {
-        formData.append("video", data.video[0]);
-      }
-      formData.append("remove_image", removeImage);
-
-      formData.append("remove_audio", removeAudio);
-
-      formData.append("remove_video", removeVideo);
+      appendBlocksToFormData(formData, editBlocks);
 
       await api.put(`/lesson-sentences/${selectedSentence.id}`, formData, {
         headers: {
@@ -430,35 +387,8 @@ function LessonDetailPage() {
                 required: "Sentence order is required",
               }}
             />
-            <FormInput
-              label="Sentence Text"
-              register={register}
-              name="sentence_text"
-              errors={errors}
-              validation={{
-                required: "Sentence text is required",
-              }}
-            />
-            <FormFileInput
-              label="Sentence Audio"
-              register={register}
-              name="sentence_audio"
-              accept="audio/*"
-            />
 
-            <FormFileInput
-              label="Sentence Image / GIF"
-              register={register}
-              name="sentence_image"
-              accept="image/*,.gif"
-            />
-
-            <FormFileInput
-              label="Sentence Video"
-              register={register}
-              name="sentence_video"
-              accept="video/*"
-            />
+            <SentenceBlockBuilder blocks={newBlocks} onBlocksChange={setNewBlocks} />
 
             <button
               type="submit"
@@ -487,17 +417,6 @@ function LessonDetailPage() {
               onSubmit={handleEditSubmit(onEditSubmit)}
               className="space-y-6"
             >
-              <FormTextarea
-                label="Sentence Text"
-                register={editRegister}
-                name="sentence_text"
-                errors={editErrors}
-                rows={4}
-                validation={{
-                  required: "Sentence text is required",
-                }}
-              />
-
               <FormInput
                 label="Sentence Order"
                 type="number"
@@ -509,115 +428,7 @@ function LessonDetailPage() {
                 }}
               />
 
-              <FormFileInput
-                label="Replace Audio"
-                accept="audio/*"
-                register={editRegister}
-                name="audio"
-                onFileChange={(e) => {
-                  const file = e.target.files[0];
-                  if (file) {
-                    setEditAudioPreview(URL.createObjectURL(file));
-
-                    setRemoveAudio(false);
-                  }
-                }}
-              />
-
-              {editAudioPreview && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditAudioPreview("");
-
-                      setRemoveAudio(true);
-                    }}
-                    className="mt-3 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl transition-all duration-300 cursor-pointer"
-                  >
-                    Remove Audio
-                  </button>
-                  <audio key={editAudioPreview} controls className="w-full">
-                    <source src={editAudioPreview} />
-                  </audio>
-                </>
-              )}
-
-              <FormFileInput
-                label="Replace Image/GIF"
-                accept="image/*"
-                register={editRegister}
-                name="image"
-                onFileChange={(e) => {
-                  const file = e.target.files?.[0];
-
-                  if (file) {
-                    setEditImagePreview(URL.createObjectURL(file));
-
-                    setRemoveImage(false);
-                  }
-                }}
-              />
-
-              {editImagePreview && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditImagePreview("");
-
-                      setRemoveImage(true);
-                    }}
-                    className="mt-3 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl transition-all duration-300 cursor-pointer"
-                  >
-                    Remove Image
-                  </button>
-                  <img
-                    src={editImagePreview}
-                    alt="Preview"
-                    className="mt-3 w-full max-h-[300px] object-cover rounded-2xl"
-                  />
-                </div>
-              )}
-
-              <FormFileInput
-                label="Replace Video"
-                accept="video/*"
-                register={editRegister}
-                name="video"
-                onFileChange={(e) => {
-                  const file = e.target.files?.[0];
-
-                  if (file) {
-                    setEditVideoPreview(URL.createObjectURL(file));
-
-                    setRemoveVideo(false);
-                  }
-                }}
-              />
-
-              {editVideoPreview && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditVideoPreview("");
-
-                      setRemoveVideo(true);
-                    }}
-                    className="mt-3 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl transition-all duration-300 cursor-pointer"
-                  >
-                    Remove Video
-                  </button>
-                  <video
-                    key={editVideoPreview}
-                    controls
-                    className="w-full rounded-2xl"
-                  >
-                    <source src={editVideoPreview} />
-                  </video>
-                </>
-              )}
+              <SentenceBlockBuilder blocks={editBlocks} onBlocksChange={setEditBlocks} />
 
               <div className="flex justify-end gap-4 pt-4">
                 <button
