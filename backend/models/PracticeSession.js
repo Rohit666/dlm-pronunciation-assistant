@@ -38,10 +38,19 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       // Present in the real DB dump but was missing from this model —
-      // added while wiring the normalized assessment submit flow,
-      // which sets it to "completed" once an Assessment is attached.
+      // added while wiring the normalized assessment submit flow. A row
+      // is created at the FIRST /compare call for a (mentee,
+      // lesson_sentence, practice_attempt) tuple as "started", and
+      // flipped to "submitted" once an Assessment is attached at
+      // /submit. "completed" is kept in the enum for backward
+      // compatibility only — nothing writes it going forward.
       status: {
-        type: DataTypes.ENUM("started", "completed", "review_pending"),
+        type: DataTypes.ENUM(
+          "started",
+          "completed",
+          "review_pending",
+          "submitted",
+        ),
         defaultValue: "started",
       },
     },
@@ -64,6 +73,9 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "practice_attempt_id",
     });
     PracticeSession.hasOne(models.Assessment, {
+      foreignKey: "practice_session_id",
+    });
+    PracticeSession.hasMany(models.PracticeSessionTry, {
       foreignKey: "practice_session_id",
     });
   };

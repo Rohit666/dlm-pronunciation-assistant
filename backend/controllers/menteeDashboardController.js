@@ -1,4 +1,5 @@
 const { Mentee, Batch, PracticeSession, Lesson } = require("../models");
+const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 
 exports.getMenteeDashboard = async (req, res) => {
   try {
@@ -18,6 +19,9 @@ exports.getMenteeDashboard = async (req, res) => {
     const practiceCount = await PracticeSession.count({
       where: {
         mentee_id: mentee?.id,
+        // A session now exists from the first /compare call onward —
+        // only count real submissions, not in-flight/abandoned ones.
+        status: PRACTICE_SESSION_STATUSES.SUBMITTED,
       },
     });
 

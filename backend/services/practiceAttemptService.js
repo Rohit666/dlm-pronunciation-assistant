@@ -7,6 +7,7 @@ const {
   User,
 } = require("../models");
 const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses");
+const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 const REVIEW_STATUSES = require("../constants/reviewStatuses");
 
 const getOrCreatePracticeAttempt = async (menteeId, lessonId) => {
@@ -127,6 +128,13 @@ const getAttemptResult = async (attemptId, userId) => {
 
       {
         model: PracticeSession,
+        // A session now exists from the first /compare call onward —
+        // results should only show real submissions, never a stray
+        // in-progress/abandoned compare. required:false keeps the
+        // attempt itself visible even if it has zero submitted
+        // sessions.
+        where: { status: PRACTICE_SESSION_STATUSES.SUBMITTED },
+        required: false,
 
         include: [
           {

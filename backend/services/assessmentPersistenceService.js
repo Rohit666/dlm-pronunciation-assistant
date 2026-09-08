@@ -8,6 +8,8 @@ const {
   AssessmentSnapshot,
   PracticeSession,
 } = require("../models");
+const practiceSessionTryService = require("./practiceSessionTryService");
+const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 
 // Aggregates per-phoneme total/weak deltas out of this assessment's
 // normalized per-word phoneme comparisons, then applies them as a
@@ -58,17 +60,26 @@ async function applyPhonemeStatsDeltas(menteeId, words, transaction) {
  *   - mirrors the score onto the legacy practice_sessions columns
  *   - upserts student_phoneme_stats
  *
+ * Also guarantees (via practiceSessionTryService.ensureTryPersisted) that
+ * the score being submitted has a practice_session_tries row, even if
+ * the /compare call behind it was a regression that was correctly
+ * dropped from the trajectory at the time.
+ *
  * @param {object} params
  * @param {import("sequelize").Model} params.practiceSession
  * @param {number} params.menteeId
  * @param {number} params.lessonSentenceId
  * @param {ReturnType<import("../utils/assessmentAdapter").normalizeAssessmentPayload>} params.normalized
+ * @param {string|null} params.recordingPath
+ * @param {{overallScore: number, tryPersisted: boolean}} params.tryInfo
  */
 async function persistAcceptedAssessment({
   practiceSession,
   menteeId,
   lessonSentenceId,
   normalized,
+  recordingPath,
+  tryInfo,
 }) {
   return sequelize.transaction(async (transaction) => {
     // Improvement delta is computed against the mentee's prior
@@ -159,9 +170,25 @@ async function persistAcceptedAssessment({
     // Backward-compat mirror — anything still reading practice_sessions
     // directly (older mentor-review views) sees a real score/status.
     await practiceSession.update(
-      { score: normalized.assessment.overall_accuracy, status: "completed" },
+      {
+        score: normalized.assessment.overall_accuracy,
+        status: PRACTICE_SESSION_STATUSES.SUBMITTED,
+        recording_path: recordingPath ?? practiceSession.recording_path,
+      },
       { transaction },
     );
+
+    // Progressive Attempt Logging: the accepted submission must always
+    // have its own practice_session_tries row, even if this exact
+    // /compare call was a regression that recordTryIfImprovement
+    // correctly dropped at the time (e.g. the mentee submitted Try 3's
+    // 30% instead of continuing to Try 4).
+    await practiceSessionTryService.ensureTryPersisted({
+      practiceSessionId: practiceSession.id,
+      overallScore: tryInfo.overallScore,
+      alreadyPersisted: tryInfo.tryPersisted,
+      transaction,
+    });
 
     await applyPhonemeStatsDeltas(menteeId, normalized.words, transaction);
 

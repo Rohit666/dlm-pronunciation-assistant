@@ -8,6 +8,7 @@ const {
   PracticeAttempt,
 } = require("../models");
 const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses");
+const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 const REVIEW_STATUSES = require("../constants/reviewStatuses");
 exports.getReviewAttempts = async (req, res) => {
   try {
@@ -90,6 +91,12 @@ exports.getReviewAttemptDetails = async (req, res) => {
 
         {
           model: PracticeSession,
+          // A session now exists from the first /compare call onward —
+          // mentors should only ever review real submissions, never a
+          // stray in-progress/abandoned compare. required:false keeps
+          // the attempt visible even if a sentence was never submitted.
+          where: { status: PRACTICE_SESSION_STATUSES.SUBMITTED },
+          required: false,
 
           include: [
             {

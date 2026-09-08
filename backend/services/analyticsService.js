@@ -13,6 +13,7 @@ const { Op, fn, col } = require("sequelize");
 
 const REVIEW_STATUSES = require("../constants/reviewStatuses");
 const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses");
+const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 const LESSON_STATUSES = require("../constants/lessonStatuses");
 const { parseJsonArray } = require("../utils/jsonUtils");
 
@@ -99,6 +100,10 @@ const getMentorDashboardStats = async (mentorUserId) => {
 
   const todaySubmissions = await PracticeSession.count({
     where: {
+      // A session now exists from the first /compare call onward —
+      // "submissions" means actually-submitted ones, not in-flight
+      // practice.
+      status: PRACTICE_SESSION_STATUSES.SUBMITTED,
       created_at: {
         [Op.gte]: today,
       },

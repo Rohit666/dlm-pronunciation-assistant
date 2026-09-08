@@ -11,16 +11,21 @@ const { emitPracticeSubmitted } = require("../services/eventService");
 const aiRuntimeService = require("../services/aiRuntimeService");
 const assessmentCacheService = require("../services/assessmentCacheService");
 const assessmentPersistenceService = require("../services/assessmentPersistenceService");
+const practiceSessionTryService = require("../services/practiceSessionTryService");
+const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 const {
   normalizeAssessmentPayload,
   AssessmentValidationError,
 } = require("../utils/assessmentAdapter");
 
-// POST /api/practice/compare — Transient. Calls the local Python AI
-// runtime, caches the raw result under a one-time assessment_token,
-// and returns it to the frontend. NEVER writes to a permanent
-// assessment table — a regressed/abandoned comparison costs nothing
-// but cache memory, and expires on its own (assessmentCacheService).
+// POST /api/practice/compare — Transient AI call, but NOT a no-op on the
+// DB: it finds-or-creates the sentence's open (status=started)
+// practice_sessions row, then logs this try into practice_session_tries
+// IF it beats the session's best score so far (Progressive Filter Rule —
+// intermediate regressed comparisons are still never persisted). The
+// full AI payload itself still only ever lives in the short-lived
+// assessment_token cache; /compare NEVER writes assessments/
+// word_assessments/etc — only /submit does that.
 exports.compare = async (req, res) => {
   try {
     const { lessonSentenceId, practiceAttemptId } = req.body;
@@ -58,18 +63,45 @@ exports.compare = async (req, res) => {
       language: "en",
     });
 
+    const overallScore = Number(
+      aiResponse.assessment_document.pronunciation.overall_accuracy,
+    );
+
+    const session = await practiceSessionTryService.findOrCreateOpenSession({
+      menteeId: mentee.id,
+      lessonSentenceId: Number(lessonSentenceId),
+      practiceAttemptId: practiceAttemptId ? Number(practiceAttemptId) : null,
+    });
+
+    const tryResult = await practiceSessionTryService.recordTryIfImprovement({
+      practiceSessionId: session.id,
+      overallScore,
+    });
+
+    const bestScoreSoFar = tryResult.persisted
+      ? overallScore
+      : tryResult.bestScoreSoFar;
+
     const assessment_token = assessmentCacheService.put({
       aiResponse,
       lessonSentenceId: Number(lessonSentenceId),
       practiceAttemptId: practiceAttemptId ? Number(practiceAttemptId) : null,
       menteeId: mentee.id,
       audioPath: req.file.path,
+      practiceSessionId: session.id,
+      overallScore,
+      tryPersisted: tryResult.persisted,
+      tryNumber: tryResult.tryNumber,
     });
 
     res.json({
       success: true,
       result: aiResponse,
       assessment_token,
+      practice_session_id: session.id,
+      try_persisted: tryResult.persisted,
+      try_number: tryResult.tryNumber,
+      best_score_so_far: bestScoreSoFar,
     });
   } catch (error) {
     console.error(error);
@@ -80,14 +112,16 @@ exports.compare = async (req, res) => {
   }
 };
 
-// POST /api/practice — Permanent. Creates the sentence-level
-// practice_session and, if an assessment_token is supplied, atomically
-// redeems the cached AI result into the normalized assessment tables
-// as the accepted submission (assessmentPersistenceService).
+// POST /api/practice — Permanent. Takes the practice_session_id created
+// by an earlier /compare call plus its assessment_token, redeems the
+// cached AI result, and atomically persists it into the normalized
+// assessment tables as that session's accepted submission
+// (assessmentPersistenceService), flipping the session to "submitted".
+// No practice_sessions row is created here anymore — /compare already
+// created (or reused) it.
 exports.submitPractice = async (req, res) => {
   try {
-    const { lesson_sentence_id, practice_attempt_id, assessment_token } =
-      req.body;
+    const { practice_session_id, assessment_token } = req.body;
 
     const mentee = await Mentee.findOne({
       where: { user_id: req.user.id },
@@ -100,45 +134,62 @@ exports.submitPractice = async (req, res) => {
       });
     }
 
-    let cached = null;
-    if (assessment_token) {
-      cached = assessmentCacheService.redeem(assessment_token);
-      if (!cached) {
-        return res.status(410).json({
-          success: false,
-          message:
-            "This assessment has expired or was already submitted. Please record and try again.",
-        });
-      }
-      if (Number(cached.menteeId) !== Number(mentee.id)) {
-        return res.status(403).json({
-          success: false,
-          message: "Assessment token does not belong to this mentee.",
-        });
-      }
+    if (!practice_session_id || !assessment_token) {
+      return res.status(400).json({
+        success: false,
+        message: "practice_session_id and assessment_token are required.",
+      });
     }
 
-    const session = await PracticeSession.create({
-      mentee_id: mentee.id,
-      lesson_sentence_id,
-      practice_attempt_id,
-      recording_path: cached ? cached.audioPath : null,
-    });
+    const session = await PracticeSession.findByPk(practice_session_id);
+    if (!session || Number(session.mentee_id) !== Number(mentee.id)) {
+      return res.status(404).json({
+        success: false,
+        message: "Practice session not found.",
+      });
+    }
+    if (session.status !== PRACTICE_SESSION_STATUSES.STARTED) {
+      return res.status(409).json({
+        success: false,
+        message: "This practice session was already submitted.",
+      });
+    }
 
-    let assessmentResult = null;
-    if (cached) {
-      const normalized = normalizeAssessmentPayload(cached.aiResponse);
-      assessmentResult = await assessmentPersistenceService.persistAcceptedAssessment(
-        {
-          practiceSession: session,
-          menteeId: mentee.id,
-          lessonSentenceId: Number(lesson_sentence_id),
-          normalized,
+    const cached = assessmentCacheService.redeem(assessment_token);
+    if (!cached) {
+      return res.status(410).json({
+        success: false,
+        message:
+          "This assessment has expired or was already submitted. Please record and try again.",
+      });
+    }
+    if (
+      Number(cached.menteeId) !== Number(mentee.id) ||
+      Number(cached.practiceSessionId) !== Number(session.id)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Assessment token does not belong to this practice session.",
+      });
+    }
+
+    const normalized = normalizeAssessmentPayload(cached.aiResponse);
+    const assessmentResult =
+      await assessmentPersistenceService.persistAcceptedAssessment({
+        practiceSession: session,
+        menteeId: mentee.id,
+        lessonSentenceId: cached.lessonSentenceId,
+        normalized,
+        recordingPath: cached.audioPath,
+        tryInfo: {
+          overallScore: cached.overallScore,
+          tryPersisted: cached.tryPersisted,
         },
-      );
-    }
+      });
 
-    const lessonSentence = await LessonSentence.findByPk(lesson_sentence_id);
+    const lessonSentence = await LessonSentence.findByPk(
+      cached.lessonSentenceId,
+    );
 
     if (lessonSentence) {
       const lesson = await Lesson.findByPk(lessonSentence.lesson_id);
@@ -155,13 +206,11 @@ exports.submitPractice = async (req, res) => {
       success: true,
       message: "Practice submitted successfully",
       session,
-      assessment: assessmentResult
-        ? {
-            overallAccuracy: Number(assessmentResult.assessment.overall_accuracy),
-            previousAcceptedScore: assessmentResult.previousAcceptedScore,
-            delta: assessmentResult.delta,
-          }
-        : null,
+      assessment: {
+        overallAccuracy: Number(assessmentResult.assessment.overall_accuracy),
+        previousAcceptedScore: assessmentResult.previousAcceptedScore,
+        delta: assessmentResult.delta,
+      },
     });
   } catch (error) {
     console.error(error);
@@ -191,6 +240,9 @@ exports.getPracticeHistory = async (req, res) => {
     const sessions = await PracticeSession.findAll({
       where: {
         mentee_id: mentee.id,
+        // A session now exists from the first /compare call onward —
+        // only ones actually submitted belong in "history".
+        status: PRACTICE_SESSION_STATUSES.SUBMITTED,
       },
 
       include: [

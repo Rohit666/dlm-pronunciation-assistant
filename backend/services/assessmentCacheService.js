@@ -23,16 +23,17 @@ function sweepExpired() {
 
 // Cheap opportunistic sweep — runs on every write, so an idle server
 // never needs its own timer/interval to stay clean.
-function put({ aiResponse, lessonSentenceId, practiceAttemptId, menteeId, audioPath }) {
+//
+// Takes the whole entry as one object (rather than a fixed destructured
+// list) so callers can carry extra fields — practiceSessionId,
+// overallScore, tryPersisted, tryNumber — without this function needing
+// to change every time the compare/submit contract grows.
+function put(entry) {
   sweepExpired();
 
   const token = crypto.randomUUID();
   cache.set(token, {
-    aiResponse,
-    lessonSentenceId,
-    practiceAttemptId,
-    menteeId,
-    audioPath,
+    ...entry,
     expiresAt: Date.now() + TTL_MS,
   });
 

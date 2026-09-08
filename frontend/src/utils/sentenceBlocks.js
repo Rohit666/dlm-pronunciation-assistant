@@ -32,12 +32,31 @@ export function createEmptyBlock(type, order) {
   };
 }
 
+// Sequelize's JSON type normally hands back a parsed array, but a
+// stringified value can surface (e.g. a raw SQL read outside the ORM) —
+// tolerate it defensively rather than silently falling back to the
+// legacy single-block view and looking like sub-text got dropped.
+function parseContentBlocks(rawContentBlocks) {
+  if (Array.isArray(rawContentBlocks)) return rawContentBlocks;
+  if (typeof rawContentBlocks === "string") {
+    try {
+      const parsed = JSON.parse(rawContentBlocks);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 // Builds the in-memory block list from a saved LessonSentence. Prefers
 // content_blocks (Part 1); falls back to the legacy flat columns for
 // any row the migration backfill somehow missed.
 export function blocksFromSentence(sentence, apiBaseUrl) {
-  if (Array.isArray(sentence?.content_blocks) && sentence.content_blocks.length) {
-    return sentence.content_blocks
+  const contentBlocks = parseContentBlocks(sentence?.content_blocks);
+
+  if (contentBlocks && contentBlocks.length) {
+    return contentBlocks
       .slice()
       .sort((a, b) => a.order - b.order)
       .map((block) => ({

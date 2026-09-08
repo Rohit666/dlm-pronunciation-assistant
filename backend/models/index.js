@@ -35,6 +35,10 @@ db.AssessmentSnapshot = require("./AssessmentSnapshot")(
   sequelize,
   Sequelize.DataTypes,
 );
+db.PracticeSessionTry = require("./PracticeSessionTry")(
+  sequelize,
+  Sequelize.DataTypes,
+);
 // Run associations
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {

@@ -18,6 +18,7 @@ const PronunciationLoadingPage = () => {
     currentIndex,
     setAssessment,
     setAssessmentToken,
+    setPracticeSessionId,
     setStage,
   } = usePracticePlayer();
 
@@ -59,6 +60,7 @@ const PronunciationLoadingPage = () => {
 
         setAssessment(adaptedAssessment);
         setAssessmentToken(response.assessment_token);
+        setPracticeSessionId(response.practice_session_id);
 
         setCurrentStep(steps.length - 1);
 
@@ -77,6 +79,7 @@ const PronunciationLoadingPage = () => {
     attemptId,
     setAssessment,
     setAssessmentToken,
+    setPracticeSessionId,
     setStage,
   ]);
   /*

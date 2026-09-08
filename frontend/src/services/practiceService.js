@@ -1,16 +1,12 @@
 import api from "./api";
 
 // Permanent submit. No file upload — the recording was already sent to
-// /practice/compare; this redeems the cached assessment_token (if any)
-// into the accepted, permanently-persisted submission.
-export const submitPractice = async ({
-  lessonSentenceId,
-  practiceAttemptId,
-  assessmentToken,
-}) => {
+// /practice/compare, which created (or reused) the practice_session and
+// returned its id. This just redeems the cached assessment_token into
+// that session's accepted, permanently-persisted submission.
+export const submitPractice = async ({ practiceSessionId, assessmentToken }) => {
   const response = await api.post("/practice", {
-    lesson_sentence_id: lessonSentenceId,
-    practice_attempt_id: practiceAttemptId,
+    practice_session_id: practiceSessionId,
     assessment_token: assessmentToken,
   });
 

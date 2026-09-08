@@ -4,6 +4,62 @@ import { CSS } from "@dnd-kit/utilities";
 
 import { GripVertical, Pencil, Trash2 } from "lucide-react";
 import { API_BASE_URL } from "../constants/api";
+import { blocksFromSentence } from "../utils/sentenceBlocks";
+
+// Renders one block's text + its own attachments only — never the
+// legacy flat sentence_text/audio_path/image_path/video_path, which
+// only ever mirror the main_text block and would silently hide
+// sub-text blocks and misattribute their media to "the sentence" as a
+// whole (the bug this component previously had).
+function BlockPreview({ block, index }) {
+  const hasAttachments = block.attachments.length > 0;
+
+  return (
+    <div className="border border-gray-100 rounded-2xl p-4">
+      <span className="inline-block px-2.5 py-0.5 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-700 mb-2">
+        {block.type === "main_text" ? "Main Text" : `Sub-Text ${index}`}
+      </span>
+
+      <p className="text-gray-800 leading-7">{block.text}</p>
+
+      {hasAttachments && (
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {block.attachments.map((attachment) => {
+            if (attachment.type === "image") {
+              return (
+                <img
+                  key={attachment.file_path}
+                  src={attachment.previewUrl}
+                  alt="Sentence"
+                  className="w-full h-40 object-cover rounded-xl"
+                />
+              );
+            }
+            if (attachment.type === "audio") {
+              return (
+                <audio key={attachment.file_path} controls className="w-full">
+                  <source src={attachment.previewUrl} />
+                </audio>
+              );
+            }
+            if (attachment.type === "video") {
+              return (
+                <video
+                  key={attachment.file_path}
+                  controls
+                  className="w-full rounded-xl"
+                >
+                  <source src={attachment.previewUrl} />
+                </video>
+              );
+            }
+            return null;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SortableSentenceCard({ sentence, onEdit, onDelete }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
@@ -16,6 +72,9 @@ function SortableSentenceCard({ sentence, onEdit, onDelete }) {
 
     transition,
   };
+
+  const blocks = blocksFromSentence(sentence, API_BASE_URL);
+  let subTextCounter = 0;
 
   return (
     <div
@@ -35,18 +94,10 @@ function SortableSentenceCard({ sentence, onEdit, onDelete }) {
 
         {/* Content */}
         <div className="flex-1">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-xl text-sm font-semibold">
-                  Order: {sentence.sentence_order}
-                </span>
-              </div>
-
-              <p className="text-gray-800 leading-7 text-lg">
-                {sentence.sentence_text}
-              </p>
-            </div>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-xl text-sm font-semibold">
+              Order: {sentence.sentence_order}
+            </span>
 
             {/* Actions */}
             <div className="flex items-center gap-3">
@@ -66,31 +117,20 @@ function SortableSentenceCard({ sentence, onEdit, onDelete }) {
             </div>
           </div>
 
-          {/* Media Preview */}
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-            {sentence.image_path && (
-              <img
-                src={`${API_BASE_URL}/${sentence.image_path}`}
-                alt="Sentence"
-                className="w-full h-48 object-cover rounded-2xl"
-              />
-            )}
-
-            {sentence.audio_path && (
-              <audio key={sentence.audio_path} controls className="w-full">
-                <source src={`${API_BASE_URL}/${sentence.audio_path}`} />
-              </audio>
-            )}
-
-            {sentence.video_path && (
-              <video
-                key={sentence.video_path}
-                controls
-                className="w-full rounded-2xl"
-              >
-                <source src={`${API_BASE_URL}/${sentence.video_path}`} />
-              </video>
-            )}
+          {/* Each block renders sequentially with only its own
+              attachments — main text, then every sub-text block in
+              order. */}
+          <div className="space-y-3">
+            {blocks.map((block) => {
+              if (block.type === "sub_text") subTextCounter += 1;
+              return (
+                <BlockPreview
+                  key={block.id}
+                  block={block}
+                  index={subTextCounter}
+                />
+              );
+            })}
           </div>
         </div>
       </div>

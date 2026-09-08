@@ -47,6 +47,12 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
   // submission. Cleared after use so a stale token is never resent.
   const [assessmentToken, setAssessmentToken] = useState(null);
 
+  // practice_session_id returned by that same /compare call — the
+  // session it created (or reused) for this sentence. /practice
+  // (submitPractice) now targets this id directly instead of
+  // re-deriving a session from lessonSentenceId/attemptId.
+  const [practiceSessionId, setPracticeSessionId] = useState(null);
+
   /*
    * Loading
    */
@@ -59,6 +65,7 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
     setAudioBlob(null);
     setAssessment(null);
     setAssessmentToken(null);
+    setPracticeSessionId(null);
     setError(null);
     setStage("recording");
   };
@@ -72,8 +79,7 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
       setError(null);
 
       await submitPractice({
-        lessonSentenceId: currentSentence.id,
-        practiceAttemptId: attemptId,
+        practiceSessionId,
         assessmentToken,
       });
 
@@ -100,6 +106,7 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
 
       setAssessment(null);
       setAssessmentToken(null);
+      setPracticeSessionId(null);
       setAudioBlob(null);
       setStage("recording");
     } catch (error) {
@@ -152,6 +159,9 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
 
     assessmentToken,
     setAssessmentToken,
+
+    practiceSessionId,
+    setPracticeSessionId,
 
     /*
      * Loading
