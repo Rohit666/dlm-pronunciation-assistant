@@ -15,4 +15,14 @@ router.get(
   recommendationController.getRecommendations,
 );
 
+// Requirement 3.2 — new, additive multi-skill adaptive engine. Left as
+// a distinct path rather than replacing "/" — see
+// recommendationService.js's getMenteeAdaptiveRecommendation comment.
+router.get(
+  "/mentee",
+  verifyToken,
+  allowRoles("mentee"),
+  recommendationController.getMenteeAdaptiveRecommendation,
+);
+
 module.exports = router;

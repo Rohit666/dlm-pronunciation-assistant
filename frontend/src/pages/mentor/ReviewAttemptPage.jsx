@@ -9,6 +9,7 @@ import {
   getReviewAttemptDetails,
   saveAttemptReview,
 } from "../../services/reviewServce";
+import SentenceDiagnostics from "../../components/mentor/SentenceDiagnostics";
 
 function ReviewAttemptPage() {
   const { attemptId } = useParams();
@@ -168,6 +169,9 @@ function ReviewAttemptPage() {
               <audio controls className="w-full">
                 <source src={`${API_BASE_URL}/${session.recording_path}`} />
               </audio>
+
+              <SentenceDiagnostics assessment={session.Assessment} />
+
               <div className="mt-6">
                 <label
                   className="

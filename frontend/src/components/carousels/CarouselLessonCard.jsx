@@ -1,4 +1,4 @@
-import { Image as ImageIcon, PlayCircle } from "lucide-react";
+import { Image as ImageIcon, PlayCircle, Lock } from "lucide-react";
 import { API_BASE_URL } from "../../constants/api";
 import { phonemeLabel } from "../../mock/phonemeCatalog";
 
@@ -6,15 +6,24 @@ import { phonemeLabel } from "../../mock/phonemeCatalog";
 // existing card visual language (rounded-3xl, shadow-sm, hover lift)
 // from RecommendationCard/EntityCard rather than inventing a new one.
 function CarouselLessonCard({ lesson, onOpen, matchReason }) {
+  const locked = Boolean(lesson.locked);
+
   return (
     <button
       type="button"
-      onClick={() => onOpen(lesson.id)}
-      className="
+      onClick={() => !locked && onOpen(lesson.id)}
+      aria-disabled={locked}
+      title={locked ? `Locked — reach CEFR ${lesson.cefrLevel} to unlock` : undefined}
+      className={`
         snap-start shrink-0 w-64 text-left
         bg-white rounded-3xl shadow-sm overflow-hidden
-        hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer
-      "
+        transition-all duration-300
+        ${
+          locked
+            ? "opacity-60 cursor-not-allowed"
+            : "hover:shadow-lg hover:-translate-y-1 cursor-pointer"
+        }
+      `}
     >
       <div className="h-36 bg-gray-100 relative">
         {lesson.thumbnail ? (
@@ -29,7 +38,15 @@ function CarouselLessonCard({ lesson, onOpen, matchReason }) {
           </div>
         )}
 
-        {lesson.status === "in_progress" && (
+        {locked && (
+          <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+            <div className="bg-white/90 rounded-full p-2">
+              <Lock size={18} className="text-gray-700" />
+            </div>
+          </div>
+        )}
+
+        {!locked && lesson.status === "in_progress" && (
           <div className="absolute inset-x-0 bottom-0 h-1.5 bg-black/10">
             <div
               className="h-full bg-indigo-500"
@@ -38,7 +55,7 @@ function CarouselLessonCard({ lesson, onOpen, matchReason }) {
           </div>
         )}
 
-        {lesson.status === "in_progress" && (
+        {!locked && lesson.status === "in_progress" && (
           <div className="absolute top-3 right-3 bg-white/90 rounded-full p-1">
             <PlayCircle size={18} className="text-indigo-600" />
           </div>

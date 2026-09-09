@@ -94,9 +94,12 @@ exports.updateAttemptProgress = async (req, res) => {
 exports.completeAttempt = async (req, res) => {
   try {
     const attemptId = req.params.id;
-    const response = await practiceAttemptService.completeAttempt(attemptId);
+    const { overallScore, passed } =
+      await practiceAttemptService.completeAttempt(attemptId);
     res.json({
       success: true,
+      overallScore,
+      passed,
     });
   } catch (error) {
     console.error(error);

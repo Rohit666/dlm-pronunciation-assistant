@@ -39,7 +39,7 @@ db.PracticeSessionTry = require("./PracticeSessionTry")(
   sequelize,
   Sequelize.DataTypes,
 );
-db.StudentProgression = require("./StudentProgression")(
+db.MenteeCefrMilestone = require("./MenteeCefrMilestone")(
   sequelize,
   Sequelize.DataTypes,
 );

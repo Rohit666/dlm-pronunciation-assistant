@@ -28,6 +28,8 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const mentorRoutes = require("./routes/mentorRoutes");
 const practiceAttemptRoutes = require("./routes/practiceAttemptRoutes");
 const mentorAnalyticsRoutes = require("./routes/mentorAnalyticsRoutes");
+const menteeInsightsRoutes = require("./routes/menteeInsightsRoutes");
+const mentorInsightsRoutes = require("./routes/mentorInsightsRoutes");
 const recommendationRoutes = require("./routes/recommendationRoutes");
 const aiRuntimeRoutes = require("./routes/aiRuntimeRoutes");
 app.use(
@@ -77,6 +79,12 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/mentor", mentorRoutes);
 app.use("/api/practice-attempts", practiceAttemptRoutes);
 app.use("/api/analytics", mentorAnalyticsRoutes);
+// Milestone 5/6 — mounted at the same /api/analytics prefix as the
+// existing weak-students/inactive-students/etc router above. No path
+// collision: these live under /mentee/* and /mentor/* sub-paths that
+// router doesn't define.
+app.use("/api/analytics", menteeInsightsRoutes);
+app.use("/api/analytics", mentorInsightsRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/ai-runtime", aiRuntimeRoutes);
 module.exports = app;
