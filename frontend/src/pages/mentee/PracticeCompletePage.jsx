@@ -7,6 +7,14 @@ import SecondaryButton from "../../components/common/SecondaryButton";
 import { getPracticeAttempt } from "../../services/practiceAttemptService";
 import { ROUTES } from "../../constants/routes";
 
+// Self-paced (Requirement 1.1): completion no longer waits on mentor
+// review. `attempt.status === "submitted"` means the computed
+// overall_score already cleared the pass threshold and CEFR progress
+// already advanced server-side — mentor review, if any, arrives later
+// as optional formative feedback and is never what unblocks this
+// screen.
+const PASS_THRESHOLD = 70;
+
 function PracticeCompletePage() {
   const navigate = useNavigate();
   const { lessonId, attemptId } = useParams();
@@ -23,6 +31,12 @@ function PracticeCompletePage() {
       console.error(error);
     }
   };
+
+  const passed = attempt?.status === "submitted";
+  const score =
+    attempt?.overall_score !== null && attempt?.overall_score !== undefined
+      ? Number(attempt.overall_score)
+      : null;
 
   return (
     <DashboardLayout>
@@ -42,7 +56,7 @@ function PracticeCompletePage() {
             text-center
           "
         >
-          <div className="text-7xl">🎉</div>
+          <div className="text-7xl">{passed ? "🎉" : "💪"}</div>
 
           <h1
             className="
@@ -51,7 +65,7 @@ function PracticeCompletePage() {
               mt-6
             "
           >
-            Practice Completed
+            {passed ? "Lesson Complete!" : "Almost There"}
           </h1>
 
           <p
@@ -60,7 +74,9 @@ function PracticeCompletePage() {
               mt-3
             "
           >
-            Great work!
+            {passed
+              ? "Great work! Your progress has been saved automatically."
+              : `Score below ${PASS_THRESHOLD}% — keep practicing this lesson to unlock the next level.`}
           </p>
 
           <div
@@ -77,8 +93,15 @@ function PracticeCompletePage() {
               <strong>Attempt:</strong> #{attempt?.attempt_number}
             </div>
 
+            {score !== null && (
+              <div>
+                <strong>Overall Score:</strong> {score}%
+              </div>
+            )}
+
             <div>
-              <strong>Status:</strong> Pending Mentor Review
+              <strong>Status:</strong>{" "}
+              {passed ? "Submitted — CEFR progress updated" : "In Progress"}
             </div>
           </div>
 

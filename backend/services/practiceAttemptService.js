@@ -9,6 +9,8 @@ const {
 const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses");
 const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 const REVIEW_STATUSES = require("../constants/reviewStatuses");
+const progressionService = require("./progressionService");
+const { PASS_THRESHOLD } = require("../constants/progressionConfig");
 
 const getOrCreatePracticeAttempt = async (menteeId, lessonId) => {
   let attempt = await PracticeAttempt.findOne({
@@ -61,19 +63,49 @@ const updateProgress = async (attemptId, sentenceOrder) => {
     },
   );
 };
+// Requirement 1.1 (self-paced progression): NOT a rubber stamp. Computes
+// the attempt's overall_score from its submitted sentences and only
+// flips status -> "submitted" (and advances the mentee's CEFR level)
+// when that score clears PASS_THRESHOLD. review_status / mentor review
+// are never consulted here — mentor review stays fully optional,
+// formative feedback that can arrive before or after this call, never a
+// gate on it.
+//
+// Below threshold: overall_score is still recorded (so the mentee sees
+// where they stand), but status stays "in_progress" and completed_at
+// stays unset — getOrCreatePracticeAttempt's existing resume query
+// (status=in_progress AND review_status=pending) picks this exact
+// attempt back up next time the mentee opens the lesson, so they can
+// keep improving individual sentences (via the progressive-tries
+// mechanism already in place) and re-call /complete once ready. Calling
+// this again after passing is a safe no-op re-evaluation, not a re-grade
+// — evaluateAndAdvanceCefr is itself idempotent.
 const completeAttempt = async (attemptId) => {
-  await PracticeAttempt.update(
-    {
-      status: PRACTICE_ATTEMPT_STATUSES.SUBMITTED,
-      completed_at: new Date(),
-    },
+  const attempt = await PracticeAttempt.findByPk(attemptId);
+  if (!attempt) {
+    throw new Error("Practice attempt not found");
+  }
 
-    {
-      where: {
-        id: attemptId,
-      },
-    },
+  const overallScore = await progressionService.computeAttemptOverallScore(
+    attemptId,
   );
+  const passed = overallScore !== null && overallScore >= PASS_THRESHOLD;
+
+  if (passed) {
+    await attempt.update({
+      status: PRACTICE_ATTEMPT_STATUSES.SUBMITTED,
+      overall_score: overallScore,
+      completed_at: new Date(),
+    });
+
+    await progressionService.evaluateAndAdvanceCefr(attempt.mentee_id);
+  } else {
+    await attempt.update({
+      overall_score: overallScore ?? 0,
+    });
+  }
+
+  return { overallScore, passed, attempt };
 };
 const getMenteeAttempts = async (userId) => {
   const mentee = await Mentee.findOne({

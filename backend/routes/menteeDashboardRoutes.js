@@ -15,4 +15,27 @@ router.get(
   menteeDashboardController.getMenteeDashboard,
 );
 
+// Requirement 1.2 — live replacements for menteeInsightsService.js's
+// remaining mocks (getDiscoveryCarousels / getCefrMilestones /
+// getAttemptTrajectory). Paths match the "(proposed)" comments already
+// left in that mock service.
+router.get(
+  "/carousels",
+  verifyToken,
+  allowRoles("mentee"),
+  menteeDashboardController.getDiscoveryCarousels,
+);
+router.get(
+  "/milestones",
+  verifyToken,
+  allowRoles("mentee"),
+  menteeDashboardController.getCefrMilestones,
+);
+router.get(
+  "/attempt-trajectory",
+  verifyToken,
+  allowRoles("mentee"),
+  menteeDashboardController.getAttemptTrajectory,
+);
+
 module.exports = router;

@@ -21,6 +21,16 @@ module.exports = (sequelize, DataTypes) => {
       roll_number: {
         type: DataTypes.STRING(50),
       },
+
+      // Requirement 1.1 (self-paced progression): the CEFR level this
+      // mentee is unlocked through. Advances via progressionService once
+      // every published lesson at the current level has a submitted
+      // attempt scoring >= PASS_THRESHOLD — never on mentor review.
+      current_cefr_level: {
+        type: DataTypes.STRING(10),
+        allowNull: false,
+        defaultValue: "A1",
+      },
     },
     {
       tableName: "mentees",
@@ -45,7 +55,7 @@ module.exports = (sequelize, DataTypes) => {
     Mentee.hasMany(models.StudentPhonemeStat, {
       foreignKey: "mentee_id",
     });
-    Mentee.hasMany(models.StudentProgression, {
+    Mentee.hasMany(models.MenteeCefrMilestone, {
       foreignKey: "mentee_id",
     });
   };

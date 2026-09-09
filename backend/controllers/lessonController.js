@@ -1,17 +1,6 @@
-const { Lesson } = require("../models");
+const { Lesson, Mentee } = require("../models");
 const { parseJsonField } = require("../utils/jsonHelper");
-
-// FormData/JSON both send these as strings (or omit them entirely);
-// "" and undefined both mean "mentor left it unset", which for a
-// nullable/defaulted column must reach Sequelize as null/undefined,
-// never as NaN or the empty string.
-const toNullableDecimal = (value) =>
-  value === undefined || value === null || value === "" ? null : value;
-
-const toNullableInt = (value) =>
-  value === undefined || value === null || value === ""
-    ? null
-    : parseInt(value, 10);
+const progressionService = require("../services/progressionService");
 exports.getLessons = async (req, res) => {
   try {
     const { status } = req.query;
@@ -27,10 +16,30 @@ exports.getLessons = async (req, res) => {
 
       order: [["id", "DESC"]],
     });
+
+    // Requirement 3.1 / lesson-unlock sequence: only mentees see a
+    // computed `locked` flag — mentor/admin lesson-management consumers
+    // of this same list are unaffected (undefined is falsy, so nothing
+    // downstream that never checked `locked` before behaves any
+    // differently).
+    let currentCefrLevel = null;
+    if (req.user?.role === "mentee") {
+      const mentee = await Mentee.findOne({ where: { user_id: req.user.id } });
+      currentCefrLevel = mentee?.current_cefr_level || "A1";
+    }
+
     const lessons = rawLessons.map((lesson) => ({
       ...lesson.toJSON(),
       lesson_outcomes: parseJsonField(lesson.lesson_outcomes),
       target_skills: parseJsonField(lesson.target_skills),
+      ...(currentCefrLevel
+        ? {
+            locked: progressionService.isLessonLocked(
+              lesson.cefr_level,
+              currentCefrLevel,
+            ),
+          }
+        : {}),
     }));
     res.json({
       success: true,
@@ -82,9 +91,6 @@ exports.createLesson = async (req, res) => {
       estimated_duration,
       lesson_outcomes,
       target_skills,
-      passing_score,
-      framework,
-      level_order,
     } = req.body;
 
     const lesson = await Lesson.create({
@@ -99,14 +105,6 @@ exports.createLesson = async (req, res) => {
       estimated_duration,
       lesson_outcomes: lesson_outcomes ? JSON.parse(lesson_outcomes) : [],
       target_skills: target_skills ? JSON.parse(target_skills) : [],
-      // Mentor-configured unlock threshold; null falls back to the
-      // batch default, then 70.00 (see progressionService.js).
-      passing_score: toNullableDecimal(passing_score),
-      // Which milestone track this lesson advances (defaults to 'cefr'
-      // in the model when omitted); level_order is its 1-indexed
-      // position on that track, or null if untracked.
-      framework: framework || undefined,
-      level_order: toNullableInt(level_order),
     });
 
     res.status(201).json({
@@ -136,9 +134,6 @@ exports.updateLesson = async (req, res) => {
       estimated_duration,
       lesson_outcomes,
       target_skills,
-      passing_score,
-      framework,
-      level_order,
     } = req.body;
 
     const lesson = await Lesson.findByPk(id);
@@ -166,9 +161,6 @@ exports.updateLesson = async (req, res) => {
       estimated_duration,
       lesson_outcomes: lesson_outcomes ? JSON.parse(lesson_outcomes) : [],
       target_skills: target_skills ? JSON.parse(target_skills) : [],
-      passing_score: toNullableDecimal(passing_score),
-      framework: framework || lesson.framework,
-      level_order: toNullableInt(level_order),
     });
 
     res.json({

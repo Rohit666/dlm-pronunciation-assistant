@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { BookOpen, Image as ImageIcon } from "lucide-react";
+import { BookOpen, Image as ImageIcon, Lock } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
 
@@ -111,10 +111,17 @@ function LessonsPage() {
           {filteredLessons.map((lesson) => (
             <div
               key={lesson.id}
-              onClick={() => navigate(`${ROUTES.MENTEE_LESSONS}/${lesson.id}`)}
-              className="bg-white rounded-3xl shadow-sm overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer"
+              onClick={() =>
+                !lesson.locked &&
+                navigate(`${ROUTES.MENTEE_LESSONS}/${lesson.id}`)
+              }
+              className={`bg-white rounded-3xl shadow-sm overflow-hidden transition-all duration-300 ${
+                lesson.locked
+                  ? "opacity-60 cursor-not-allowed"
+                  : "hover:shadow-2xl cursor-pointer"
+              }`}
             >
-              <div className="h-56 bg-gray-100 overflow-hidden">
+              <div className="h-56 bg-gray-100 overflow-hidden relative">
                 {lesson.thumbnail ? (
                   <img
                     src={`${API_BASE_URL}/${lesson.thumbnail}`}
@@ -124,6 +131,14 @@ function LessonsPage() {
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <ImageIcon size={48} className="text-gray-400" />
+                  </div>
+                )}
+
+                {lesson.locked && (
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                    <div className="bg-white/90 rounded-full p-3">
+                      <Lock size={24} className="text-gray-700" />
+                    </div>
                   </div>
                 )}
               </div>
@@ -143,8 +158,17 @@ function LessonsPage() {
                   {lesson.description || "No description"}
                 </p>
 
-                <button className="mt-6 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-semibold transition-all duration-300 cursor-pointer">
-                  Expolre Lesson
+                <button
+                  disabled={lesson.locked}
+                  className={`mt-6 w-full py-3 rounded-2xl font-semibold transition-all duration-300 ${
+                    lesson.locked
+                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+                  }`}
+                >
+                  {lesson.locked
+                    ? `Reach CEFR ${lesson.cefr_level} to unlock`
+                    : "Explore Lesson"}
                 </button>
               </div>
             </div>

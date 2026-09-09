@@ -1,5 +1,4 @@
 const {
-  sequelize,
   PracticeSession,
   Mentee,
   LessonSentence,
@@ -7,11 +6,15 @@ const {
   User,
   Batch,
   PracticeAttempt,
+  Assessment,
+  WordAssessment,
+  PhonemeAssessment,
+  Diagnosis,
+  LearningNeed,
 } = require("../models");
 const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses");
 const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 const REVIEW_STATUSES = require("../constants/reviewStatuses");
-const progressionService = require("../services/progressionService");
 exports.getReviewAttempts = async (req, res) => {
   try {
     const mentorId = req.user.id;
@@ -104,6 +107,45 @@ exports.getReviewAttemptDetails = async (req, res) => {
             {
               model: LessonSentence,
             },
+            // Requirement 2 (Diagnostic Mentor Review Console): the
+            // normalized assessment chain for this sentence's accepted
+            // submission, so the review page can show word-by-word and
+            // phoneme-level diagnostics alongside the recording —
+            // is_accepted=true is always exactly the session's official
+            // submission (assessmentPersistenceService only ever leaves
+            // one accepted assessment per session). required:false —
+            // an older session predating the normalized schema may have
+            // no assessment row at all.
+            {
+              model: Assessment,
+              where: { is_accepted: true },
+              required: false,
+              include: [
+                {
+                  model: WordAssessment,
+                  as: "words",
+                  required: false,
+                  include: [
+                    {
+                      model: PhonemeAssessment,
+                      as: "phonemes",
+                      required: false,
+                    },
+                  ],
+                },
+                {
+                  model: Diagnosis,
+                  required: false,
+                  include: [
+                    {
+                      model: LearningNeed,
+                      as: "needs",
+                      required: false,
+                    },
+                  ],
+                },
+              ],
+            },
           ],
 
           order: [["id", "ASC"]],
@@ -139,63 +181,42 @@ exports.saveAttemptReview = async (req, res) => {
 
     const mentorId = req.user.id;
 
-    // Saving the review, finalizing overall_score, and evaluating
-    // progression all have to land together or not at all — a mentee
-    // must never be advanced without the score that justified it, nor
-    // have a score saved that silently failed to advance them.
-    const progressionResult = await sequelize.transaction(async (transaction) => {
-      // Save sentence reviews
-      for (const review of sentenceReviews) {
-        await PracticeSession.update(
-          {
-            score: review.score,
-            feedback: review.feedback,
-            reviewed_by: mentorId,
-            reviewed_at: new Date(),
+    // Save sentence reviews
+    for (const review of sentenceReviews) {
+      await PracticeSession.update(
+        {
+          score: review.score,
+          feedback: review.feedback,
+          reviewed_by: mentorId,
+          reviewed_at: new Date(),
+        },
+        {
+          where: {
+            id: review.sessionId,
           },
-          {
-            where: {
-              id: review.sessionId,
-            },
-            transaction,
-          },
-        );
-      }
-
-      const attempt = await PracticeAttempt.findByPk(id, { transaction });
-      if (!attempt) {
-        throw new Error("Attempt not found");
-      }
-
-      const updateData = {
-        overall_score: overallScore,
-        overall_feedback: overallFeedback,
-        reviewed_by: mentorId,
-        reviewed_at: new Date(),
-        review_status: REVIEW_STATUSES.REVIEWED,
-      };
-      if (!attempt.first_reviewed_at) {
-        updateData.first_reviewed_at = new Date();
-      }
-      await attempt.update(updateData, { transaction });
-
-      // Threshold = lesson.passing_score ?? batch.default_passing_threshold
-      // ?? 70.00 — resolved and applied in progressionService.js, not here.
-      return progressionService.evaluateLessonCompletion({
-        menteeId: attempt.mentee_id,
-        lessonId: attempt.lesson_id,
-        overallScore,
-        transaction,
-      });
+        },
+      );
+    }
+    const updateData = {
+      overall_score: overallScore,
+      overall_feedback: overallFeedback,
+      reviewed_by: mentorId,
+      reviewed_at: new Date(),
+      review_status: REVIEW_STATUSES.REVIEWED,
+    };
+    const attempt = await PracticeAttempt.findByPk(id);
+    if (!attempt.first_reviewed_at) {
+      updateData.first_reviewed_at = new Date();
+    }
+    await PracticeAttempt.update(updateData, {
+      where: {
+        id,
+      },
     });
 
     res.json({
       success: true,
       message: "Review saved successfully",
-      progression: {
-        passed: progressionResult.passed,
-        threshold: progressionResult.threshold,
-      },
     });
   } catch (error) {
     console.error(error);

@@ -10,6 +10,7 @@ import DashboardLayout from "../../layouts/DashboardLayout";
 
 import PageHeader from "../../components/PageHeader";
 import RecommendationSection from "../../components/recommendations/RecommendationSection";
+import AdaptiveRecommendationPanel from "../../components/recommendations/AdaptiveRecommendationPanel";
 import StatsCard from "../../components/StatsCard";
 import CarouselRow from "../../components/carousels/CarouselRow";
 import CarouselLessonCard from "../../components/carousels/CarouselLessonCard";
@@ -25,11 +26,13 @@ import {
   getScoreOverview,
   getAttemptTrajectory,
 } from "../../services/menteeInsightsService";
+import { getAdaptiveRecommendations } from "../../services/recommendationService";
 
 function DashboardPage() {
   const navigate = useNavigate();
   const [recommendations, setRecommendations] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
+  const [adaptiveRecommendation, setAdaptiveRecommendation] = useState(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -81,13 +84,24 @@ function DashboardPage() {
     }
   };
 
+  // Requirement 3.2 — separate effect, same reasoning as fetchInsights
+  // above: a failure here should never block the rest of the dashboard.
+  const fetchAdaptiveRecommendation = async () => {
+    try {
+      const data = await getAdaptiveRecommendations();
+      setAdaptiveRecommendation(data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   useEffect(() => {
     fetchDashboard();
     fetchInsights();
+    fetchAdaptiveRecommendation();
   }, []);
 
-  const openLesson = (lessonId) =>
-    navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}`);
+  const openLesson = (lessonId) => navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}`);
 
   return (
     <DashboardLayout>
@@ -124,6 +138,11 @@ function DashboardPage() {
         />
       )}
 
+      <AdaptiveRecommendationPanel
+        recommendation={adaptiveRecommendation}
+        onOpenLesson={openLesson}
+      />
+
       {/* Progress & Milestones */}
       {!insightsLoading && (
         <div className="mb-10">
@@ -146,11 +165,7 @@ function DashboardPage() {
             emptyMessage="No new lessons queued right now."
           >
             {carousels.upNext.map((lesson) => (
-              <CarouselLessonCard
-                key={lesson.id}
-                lesson={lesson}
-                onOpen={openLesson}
-              />
+              <CarouselLessonCard key={lesson.id} lesson={lesson} onOpen={openLesson} />
             ))}
           </CarouselRow>
 
@@ -177,11 +192,7 @@ function DashboardPage() {
             emptyMessage="Nothing in progress — start a lesson below."
           >
             {carousels.continuePracticing.map((lesson) => (
-              <CarouselLessonCard
-                key={lesson.id}
-                lesson={lesson}
-                onOpen={openLesson}
-              />
+              <CarouselLessonCard key={lesson.id} lesson={lesson} onOpen={openLesson} />
             ))}
           </CarouselRow>
 
@@ -192,11 +203,7 @@ function DashboardPage() {
             emptyMessage="You haven't bookmarked any lessons yet."
           >
             {carousels.watchlist.map((lesson) => (
-              <CarouselLessonCard
-                key={lesson.id}
-                lesson={lesson}
-                onOpen={openLesson}
-              />
+              <CarouselLessonCard key={lesson.id} lesson={lesson} onOpen={openLesson} />
             ))}
           </CarouselRow>
         </div>
@@ -241,6 +248,12 @@ function DashboardPage() {
                   <h2 className="text-xl font-bold text-gray-800">
                     {lesson.title}
                   </h2>
+
+                  {lesson.locked && (
+                    <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded-xl text-sm font-semibold mr-2">
+                      🔒 Locked
+                    </span>
+                  )}
 
                   <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-xl text-sm font-semibold">
                     {lesson.cefr_level}

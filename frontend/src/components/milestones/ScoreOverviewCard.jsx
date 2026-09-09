@@ -35,6 +35,17 @@ function ScoreMeter({ label, score }) {
 function ScoreOverviewCard({ scores }) {
   if (!scores) return null;
 
+  // fluency/completeness are omitted (not 0) when the data source
+  // can't supply them — e.g. the real ai-runtime pipeline has no
+  // fluency_score/completeness_score. Skip the meter entirely rather
+  // than render a fabricated "0%"/"null%".
+  const hasAccuracy = scores.accuracy !== null && scores.accuracy !== undefined;
+  const hasFluency = scores.fluency !== null && scores.fluency !== undefined;
+  const hasCompleteness =
+    scores.completeness !== null && scores.completeness !== undefined;
+
+  if (!hasAccuracy && !hasFluency && !hasCompleteness) return null;
+
   return (
     <div className="bg-white rounded-3xl shadow-sm p-6">
       <h3 className="text-lg font-bold text-gray-800 mb-6">
@@ -42,9 +53,11 @@ function ScoreOverviewCard({ scores }) {
       </h3>
 
       <div className="space-y-5">
-        <ScoreMeter label="Accuracy" score={scores.accuracy} />
-        <ScoreMeter label="Fluency" score={scores.fluency} />
-        <ScoreMeter label="Completeness" score={scores.completeness} />
+        {hasAccuracy && <ScoreMeter label="Accuracy" score={scores.accuracy} />}
+        {hasFluency && <ScoreMeter label="Fluency" score={scores.fluency} />}
+        {hasCompleteness && (
+          <ScoreMeter label="Completeness" score={scores.completeness} />
+        )}
       </div>
     </div>
   );
