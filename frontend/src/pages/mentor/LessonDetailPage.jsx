@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Plus } from "lucide-react";
+import { Plus, FileText, ClipboardList } from "lucide-react";
 
 import { useParams } from "react-router-dom";
 
@@ -30,11 +30,22 @@ import {
   appendBlocksToFormData,
 } from "../../utils/sentenceBlocks";
 import { API_BASE_URL } from "../../constants/api";
+import ExerciseBuilderDrawer from "../../features/exercises/mentor/ExerciseBuilderDrawer";
+import ExerciseCard from "../../features/exercises/mentor/ExerciseCard";
+import {
+  getLessonExercises,
+  deleteLessonExercise,
+} from "../../services/exerciseService";
 
 function LessonDetailPage() {
   const navigate = useNavigate();
 
   const { lessonId } = useParams();
+
+  // "sentences" | "exercises" — the two content types a lesson can hold.
+  // Sentences (pronunciation practice) keep all their existing behavior
+  // below untouched; exercises are a new, parallel authoring surface.
+  const [activeTab, setActiveTab] = useState("sentences");
 
   const [sentences, setSentences] = useState([]);
 
@@ -43,6 +54,12 @@ function LessonDetailPage() {
   const [deleteModal, setDeleteModal] = useState(false);
 
   const [selectedSentence, setSelectedSentence] = useState(null);
+
+  const [exercises, setExercises] = useState([]);
+  const [exercisesLoading, setExercisesLoading] = useState(true);
+  const [exerciseDrawerOpen, setExerciseDrawerOpen] = useState(false);
+  const [exerciseDeleteModal, setExerciseDeleteModal] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState(null);
 
   // Single shared drawer (Create + Edit) — see SentenceBlockBuilder for
   // the block editor itself. drawerMode picks which endpoint submit
@@ -70,6 +87,41 @@ function LessonDetailPage() {
   useEffect(() => {
     fetchSentences();
   }, []);
+
+  const fetchExercises = async () => {
+    try {
+      setExercisesLoading(true);
+      const data = await getLessonExercises(lessonId);
+      setExercises(data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load exercises");
+    } finally {
+      setExercisesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchExercises();
+  }, []);
+
+  const handleExerciseCreated = () => {
+    setExerciseDrawerOpen(false);
+    fetchExercises();
+  };
+
+  const handleDeleteExercise = async () => {
+    try {
+      await deleteLessonExercise(selectedExercise.id);
+      toast.success("Exercise deleted successfully");
+      setExerciseDeleteModal(false);
+      setSelectedExercise(null);
+      fetchExercises();
+    } catch (error) {
+      console.error(error);
+      toast.error("Delete failed");
+    }
+  };
 
   const openCreateDrawer = () => {
     setDrawerMode("create");
@@ -207,56 +259,128 @@ function LessonDetailPage() {
           <span>Back to Lessons</span>
         </button>
 
+        {activeTab === "sentences" ? (
+          <button
+            onClick={openCreateDrawer}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl transition-all duration-300 cursor-pointer"
+          >
+            <Plus size={18} />
+            Add Sentence
+          </button>
+        ) : (
+          <button
+            onClick={() => setExerciseDrawerOpen(true)}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl transition-all duration-300 cursor-pointer"
+          >
+            <Plus size={18} />
+            Add Assessment / Test
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 mb-6 bg-white rounded-2xl p-1.5 shadow-sm w-fit">
         <button
-          onClick={openCreateDrawer}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl transition-all duration-300 cursor-pointer"
+          onClick={() => setActiveTab("sentences")}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 cursor-pointer ${
+            activeTab === "sentences"
+              ? "bg-indigo-600 text-white"
+              : "text-gray-500 hover:bg-gray-100"
+          }`}
         >
-          <Plus size={18} />
-          Add Sentence
+          <FileText size={16} />
+          Sentences
+        </button>
+        <button
+          onClick={() => setActiveTab("exercises")}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 cursor-pointer ${
+            activeTab === "exercises"
+              ? "bg-indigo-600 text-white"
+              : "text-gray-500 hover:bg-gray-100"
+          }`}
+        >
+          <ClipboardList size={16} />
+          Assessments &amp; Exercises
         </button>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Sentences</h2>
+      {activeTab === "sentences" ? (
+        <div className="bg-white rounded-3xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">Sentences</h2>
 
-          <div className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-semibold">
-            {sentences.length} Total
+            <div className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-semibold">
+              {sentences.length} Total
+            </div>
           </div>
-        </div>
 
-        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          {!loading && sentences.length === 0 && (
+          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            {!loading && sentences.length === 0 && (
+              <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+                <h3 className="text-2xl font-bold text-gray-700 mb-3">
+                  No sentences added
+                </h3>
+
+                <p className="text-gray-500">
+                  Start building pronunciation practice content.
+                </p>
+              </div>
+            )}
+            <SortableContext
+              items={sentences.map((sentence) => sentence.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-5">
+                {sentences.map((sentence) => (
+                  <SortableSentenceCard
+                    key={sentence.id}
+                    sentence={sentence}
+                    onEdit={openEditDrawer}
+                    onDelete={(s) => {
+                      setSelectedSentence(s);
+                      setDeleteModal(true);
+                    }}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </div>
+      ) : (
+        <div className="bg-white rounded-3xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">Assessments &amp; Exercises</h2>
+
+            <div className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-semibold">
+              {exercises.length} Total
+            </div>
+          </div>
+
+          {!exercisesLoading && exercises.length === 0 && (
             <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
               <h3 className="text-2xl font-bold text-gray-700 mb-3">
-                No sentences added
+                No assessments added
               </h3>
 
               <p className="text-gray-500">
-                Start building pronunciation practice content.
+                Add a quiz or test to check understanding for this lesson.
               </p>
             </div>
           )}
-          <SortableContext
-            items={sentences.map((sentence) => sentence.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="space-y-5">
-              {sentences.map((sentence) => (
-                <SortableSentenceCard
-                  key={sentence.id}
-                  sentence={sentence}
-                  onEdit={openEditDrawer}
-                  onDelete={(s) => {
-                    setSelectedSentence(s);
-                    setDeleteModal(true);
-                  }}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      </div>
+
+          <div className="space-y-4">
+            {exercises.map((exercise) => (
+              <ExerciseCard
+                key={exercise.id}
+                exercise={exercise}
+                onDelete={(ex) => {
+                  setSelectedExercise(ex);
+                  setExerciseDeleteModal(true);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <FormDrawer
         open={drawerOpen}
@@ -315,6 +439,21 @@ function LessonDetailPage() {
         message="Are you sure you want to delete this sentence?"
         onConfirm={handleDelete}
         onCancel={() => setDeleteModal(false)}
+      />
+
+      <ExerciseBuilderDrawer
+        open={exerciseDrawerOpen}
+        lessonId={lessonId}
+        onClose={() => setExerciseDrawerOpen(false)}
+        onCreated={handleExerciseCreated}
+      />
+
+      <ConfirmModal
+        isOpen={exerciseDeleteModal}
+        title="Delete Assessment"
+        message="Are you sure you want to delete this assessment? All questions and student attempt history for it will be permanently removed."
+        onConfirm={handleDeleteExercise}
+        onCancel={() => setExerciseDeleteModal(false)}
       />
     </DashboardLayout>
   );

@@ -19,6 +19,7 @@ import {
   getActiveAttempt,
 } from "../../services/practiceAttemptService";
 import PrimaryButton from "../../components/common/PrimaryButton";
+import ExerciseListSection from "../../features/exercises/ExerciseListSection";
 function LessonPracticePage() {
   const { lessonId } = useParams();
   const [sentences, setSentences] = useState([]);
@@ -118,6 +119,9 @@ function LessonPracticePage() {
           </div>
         </div>
       </div>
+
+      <ExerciseListSection lessonId={lessonId} />
+
       {loading ? (
         <div className="bg-white rounded-3xl shadow-sm">
           <Loader text="Loading lesson content..." />

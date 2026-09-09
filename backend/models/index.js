@@ -43,6 +43,16 @@ db.MenteeCefrMilestone = require("./MenteeCefrMilestone")(
   sequelize,
   Sequelize.DataTypes,
 );
+db.LessonExercise = require("./LessonExercise")(sequelize, Sequelize.DataTypes);
+db.ExerciseQuestion = require("./ExerciseQuestion")(
+  sequelize,
+  Sequelize.DataTypes,
+);
+db.ExerciseAttempt = require("./ExerciseAttempt")(sequelize, Sequelize.DataTypes);
+db.ExerciseAttemptAnswer = require("./ExerciseAttemptAnswer")(
+  sequelize,
+  Sequelize.DataTypes,
+);
 // Run associations
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {

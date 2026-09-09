@@ -32,6 +32,7 @@ const menteeInsightsRoutes = require("./routes/menteeInsightsRoutes");
 const mentorInsightsRoutes = require("./routes/mentorInsightsRoutes");
 const recommendationRoutes = require("./routes/recommendationRoutes");
 const aiRuntimeRoutes = require("./routes/aiRuntimeRoutes");
+const exerciseRoutes = require("./routes/exerciseRoutes");
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -87,4 +88,9 @@ app.use("/api/analytics", menteeInsightsRoutes);
 app.use("/api/analytics", mentorInsightsRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/ai-runtime", aiRuntimeRoutes);
+// Milestone 9 — POST/GET /api/exercises/:exerciseId/{submit,attempts}.
+// Exercise CRUD-by-lesson lives under /api/lessons (lessonRoutes.js) and
+// /api/mentor/lessons (mentorRoutes.js) instead, per the spec's exact
+// paths — this router only owns the /api/exercises/:exerciseId/* half.
+app.use("/api/exercises", exerciseRoutes);
 module.exports = app;

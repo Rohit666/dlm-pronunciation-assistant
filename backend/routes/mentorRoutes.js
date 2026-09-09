@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 
 const mentorController = require("../controllers/mentorController");
+const exerciseController = require("../controllers/exerciseController");
 
 const { verifyToken } = require("../middleware/authMiddleware");
 
@@ -22,11 +23,18 @@ router.get(
   mentorController.getMentorMentees,
 );
 
-router.put(
-  "/batches/:id/threshold",
+// Milestone 9 — mentor authority to create exercises on their lessons.
+router.post(
+  "/lessons/:lessonId/exercises",
   verifyToken,
-  allowRoles("mentor"),
-  mentorController.updateBatchThreshold,
+  allowRoles("mentor", "admin"),
+  exerciseController.createExercise,
+);
+router.delete(
+  "/exercises/:exerciseId",
+  verifyToken,
+  allowRoles("mentor", "admin"),
+  exerciseController.deleteExercise,
 );
 
 module.exports = router;

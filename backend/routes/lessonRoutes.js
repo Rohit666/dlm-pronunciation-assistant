@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 
 const lessonController = require("../controllers/lessonController");
+const exerciseController = require("../controllers/exerciseController");
 
 const { verifyToken } = require("../middleware/authMiddleware");
 
@@ -20,6 +21,14 @@ router.post(
   lessonController.createLesson,
 );
 router.get("/:id", verifyToken, lessonController.getLessonById);
+
+// Milestone 9 — GET /api/lessons/:lessonId/exercises. Separate segment
+// count from "/:id" above, no route collision.
+router.get(
+  "/:lessonId/exercises",
+  verifyToken,
+  exerciseController.getLessonExercises,
+);
 router.put(
   "/:id",
   verifyToken,

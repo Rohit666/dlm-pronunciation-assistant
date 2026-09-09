@@ -61,25 +61,32 @@ async function getCohortHeatmap(mentorId, batchId) {
   }
 
   const rows = await sequelize.query(
-    `SELECT
-       symbol,
-       COUNT(*) AS total_students,
-       SUM(CASE WHEN student_avg_similarity < 0.6 THEN 1 ELSE 0 END) AS struggling_students
-     FROM (
-       SELECT
-         ps.mentee_id,
-         pa.expected_symbol AS symbol,
-         AVG(COALESCE(pa.similarity, 0)) AS student_avg_similarity
-       FROM phoneme_assessments pa
-       INNER JOIN word_assessments wa ON wa.id = pa.word_assessment_id
-       INNER JOIN assessments a ON a.id = wa.assessment_id
-       INNER JOIN practice_sessions ps ON ps.id = a.practice_session_id
-       WHERE ps.mentee_id IN (:menteeIds) AND a.is_accepted = TRUE
-         AND pa.expected_symbol IS NOT NULL
-       GROUP BY ps.mentee_id, pa.expected_symbol
-     ) per_student
-     GROUP BY symbol
-     ORDER BY struggling_students / total_students DESC`,
+    `SELECT 
+  symbol,
+  total_students,
+  struggling_students,
+  (struggling_students / total_students) AS struggle_rate
+FROM (
+  SELECT
+    symbol,
+    COUNT(*) AS total_students,
+    SUM(CASE WHEN student_avg_similarity < 0.6 THEN 1 ELSE 0 END) AS struggling_students
+  FROM (
+    SELECT
+      ps.mentee_id,
+      pa.expected_symbol AS symbol,
+      AVG(COALESCE(pa.similarity, 0)) AS student_avg_similarity
+    FROM phoneme_assessments pa
+    INNER JOIN word_assessments wa ON wa.id = pa.word_assessment_id
+    INNER JOIN assessments a ON a.id = wa.assessment_id
+    INNER JOIN practice_sessions ps ON ps.id = a.practice_session_id
+    WHERE ps.mentee_id IN (:menteeIds) AND a.is_accepted = TRUE
+      AND pa.expected_symbol IS NOT NULL
+    GROUP BY ps.mentee_id, pa.expected_symbol
+  ) per_student
+  GROUP BY symbol
+) grouped
+ORDER BY struggle_rate DESC;`,
     { replacements: { menteeIds }, type: QueryTypes.SELECT },
   );
 

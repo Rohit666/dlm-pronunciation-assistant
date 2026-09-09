@@ -17,32 +17,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(20),
       },
 
-      // Mentor-configured unlock/completion score for this lesson.
-      // Nullable — falls back to the lesson's batch, then to a hardcoded
-      // 70.00. Resolved in services/progressionService.js.
-      passing_score: {
-        type: DataTypes.DECIMAL(5, 2),
-        allowNull: true,
-      },
-
-      // Which milestone track this lesson advances a mentee along.
-      // 'cefr_level' above stays as the free-text CEFR label for
-      // backward-compat display; framework/level_order are what
-      // progressionService.js actually reads to increment progress.
-      framework: {
-        type: DataTypes.ENUM("cefr", "nep_stage"),
-        allowNull: false,
-        defaultValue: "cefr",
-      },
-
-      // 1-indexed position within `framework`'s track (e.g. CEFR A1..C2
-      // is 1..6). NULL means this lesson isn't part of a tracked
-      // progression — passing it never advances anyone.
-      level_order: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-      },
-
       description: {
         type: DataTypes.TEXT,
       },
@@ -53,26 +27,19 @@ module.exports = (sequelize, DataTypes) => {
 
       created_by: {
         type: DataTypes.INTEGER,
-        allowNull: true,
-        references: {
-          model: "users",
-          key: "id",
-        },
       },
       lesson_status: {
         type: DataTypes.ENUM("draft", "published", "archived"),
 
         defaultValue: "draft",
       },
-      // DB column is varchar(50), was unbounded STRING before.
       lesson_type: {
-        type: DataTypes.STRING(50),
+        type: DataTypes.STRING,
         defaultValue: "sentence_practice",
       },
 
-      // DB column is varchar(20), was unbounded STRING before.
       difficulty_level: {
-        type: DataTypes.STRING(20),
+        type: DataTypes.STRING,
         defaultValue: "beginner",
       },
 
@@ -103,6 +70,9 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "lesson_id",
     });
     Lesson.hasMany(models.PracticeAttempt, {
+      foreignKey: "lesson_id",
+    });
+    Lesson.hasMany(models.LessonExercise, {
       foreignKey: "lesson_id",
     });
   };
