@@ -25,6 +25,15 @@ module.exports = (sequelize, DataTypes) => {
           key: "id",
         },
       },
+
+      // Batch-wide fallback used when a lesson has no passing_score of
+      // its own. See services/progressionService.js for the resolution
+      // order (lesson.passing_score ?? this ?? 70.00).
+      default_passing_threshold: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: false,
+        defaultValue: 70.0,
+      },
     },
     {
       tableName: "batches",

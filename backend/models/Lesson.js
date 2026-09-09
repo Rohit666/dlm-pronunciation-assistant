@@ -17,6 +17,32 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(20),
       },
 
+      // Mentor-configured unlock/completion score for this lesson.
+      // Nullable — falls back to the lesson's batch, then to a hardcoded
+      // 70.00. Resolved in services/progressionService.js.
+      passing_score: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: true,
+      },
+
+      // Which milestone track this lesson advances a mentee along.
+      // 'cefr_level' above stays as the free-text CEFR label for
+      // backward-compat display; framework/level_order are what
+      // progressionService.js actually reads to increment progress.
+      framework: {
+        type: DataTypes.ENUM("cefr", "nep_stage"),
+        allowNull: false,
+        defaultValue: "cefr",
+      },
+
+      // 1-indexed position within `framework`'s track (e.g. CEFR A1..C2
+      // is 1..6). NULL means this lesson isn't part of a tracked
+      // progression — passing it never advances anyone.
+      level_order: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+
       description: {
         type: DataTypes.TEXT,
       },

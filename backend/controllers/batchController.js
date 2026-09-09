@@ -28,12 +28,17 @@ exports.getBatches = async (req, res) => {
 
 exports.createBatch = async (req, res) => {
   try {
-    const { batch_name, description, mentor_id } = req.body;
+    const { batch_name, description, mentor_id, default_passing_threshold } =
+      req.body;
 
     const batch = await Batch.create({
       batch_name,
       description,
       mentor_id: mentor_id || null,
+      // Omitted -> model default (70.00); explicit "" is treated the
+      // same as omitted rather than coerced into an invalid DECIMAL.
+      default_passing_threshold:
+        default_passing_threshold === "" ? undefined : default_passing_threshold,
     });
 
     res.status(201).json({
@@ -83,7 +88,8 @@ exports.updateBatch = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { batch_name, description, mentor_id } = req.body;
+    const { batch_name, description, mentor_id, default_passing_threshold } =
+      req.body;
 
     const batch = await Batch.findByPk(id);
 
@@ -98,6 +104,10 @@ exports.updateBatch = async (req, res) => {
       batch_name,
       description,
       mentor_id,
+      default_passing_threshold:
+        default_passing_threshold === ""
+          ? batch.default_passing_threshold
+          : default_passing_threshold,
     });
 
     res.json({

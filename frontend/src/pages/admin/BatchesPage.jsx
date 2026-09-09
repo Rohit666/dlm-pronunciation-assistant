@@ -115,6 +115,7 @@ function BatchesPage() {
       batch_name: batch.batch_name,
       description: batch.description,
       mentor_id: String(batch.mentor_id || ""),
+      default_passing_threshold: batch.default_passing_threshold ?? "",
     });
 
     setShowEditDrawer(true);
@@ -271,6 +272,20 @@ function BatchesPage() {
               register={editRegister}
               name="mentor_id"
               errors={editErrors}
+            />
+          </div>
+          <div className="mb-4">
+            <FormInput
+              label="Default Passing Score (%)"
+              type="number"
+              register={editRegister}
+              name="default_passing_threshold"
+              errors={editErrors}
+              placeholder="Applies to lessons in this batch with no score of their own"
+              validation={{
+                min: { value: 0, message: "Must be at least 0" },
+                max: { value: 100, message: "Must be at most 100" },
+              }}
             />
           </div>
           <div className="flex justify-end gap-4 pt-4">

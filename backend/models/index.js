@@ -39,6 +39,10 @@ db.PracticeSessionTry = require("./PracticeSessionTry")(
   sequelize,
   Sequelize.DataTypes,
 );
+db.StudentProgression = require("./StudentProgression")(
+  sequelize,
+  Sequelize.DataTypes,
+);
 // Run associations
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
