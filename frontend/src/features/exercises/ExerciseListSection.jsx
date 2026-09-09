@@ -1,15 +1,20 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ClipboardList, ChevronRight } from "lucide-react";
 import { getLessonExercises } from "../../services/exerciseService";
-import ExercisePlayerModal from "./ExercisePlayerModal";
+import { ROUTES } from "../../constants/routes";
 
 // Mounted on the mentee lesson-overview page (LessonPracticePage.jsx),
 // alongside the sentence-practice content — exercises are a parallel,
 // retakable quiz modality, not part of the pronunciation recording flow.
+//
+// Navigates to the full-width AssessmentPlayerPage route rather than
+// opening ExercisePlayerModal — that modal is deprecated (kept in the
+// repo only as prior art / a rollback reference, no longer imported).
 function ExerciseListSection({ lessonId }) {
+  const navigate = useNavigate();
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeExercise, setActiveExercise] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +43,7 @@ function ExerciseListSection({ lessonId }) {
           <button
             key={exercise.id}
             type="button"
-            onClick={() => setActiveExercise(exercise)}
+            onClick={() => navigate(ROUTES.assessmentPlayer(lessonId, exercise.id))}
             className="w-full flex items-center justify-between border rounded-2xl px-5 py-4 hover:bg-gray-50 transition-all duration-300 cursor-pointer text-left"
           >
             <div className="flex items-center gap-3">
@@ -58,13 +63,6 @@ function ExerciseListSection({ lessonId }) {
           </button>
         ))}
       </div>
-
-      {activeExercise && (
-        <ExercisePlayerModal
-          exercise={activeExercise}
-          onClose={() => setActiveExercise(null)}
-        />
-      )}
     </div>
   );
 }

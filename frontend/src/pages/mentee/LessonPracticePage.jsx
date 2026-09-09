@@ -20,21 +20,31 @@ import {
 } from "../../services/practiceAttemptService";
 import PrimaryButton from "../../components/common/PrimaryButton";
 import ExerciseListSection from "../../features/exercises/ExerciseListSection";
+import {
+  getCourseProgress,
+  updateCourseProgress,
+} from "../../services/courseStreamService";
 function LessonPracticePage() {
   const { lessonId } = useParams();
   const [sentences, setSentences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lesson, setLesson] = useState(null);
   const [activeAttempt, setActiveAttempt] = useState(null);
+  // Hierarchical Content Tree — resume pointer. When the mentee's last
+  // touched item in this course was an assessment (not the sentence
+  // set), "Resume Practice" sends them straight back to it instead of
+  // always defaulting to the sentence player.
+  const [resumeAssessmentId, setResumeAssessmentId] = useState(null);
   const navigate = useNavigate();
 
   const fetchData = async () => {
     try {
-      const [lessonResponse, sentenceResponse, attemptResponse] =
+      const [lessonResponse, sentenceResponse, attemptResponse, progressResponse] =
         await Promise.all([
           api.get(`/lessons/${lessonId}`),
           api.get(`/lesson-sentences/${lessonId}`),
           getActiveAttempt(lessonId),
+          getCourseProgress(lessonId).catch(() => null),
         ]);
 
       setLesson(lessonResponse.data.lesson);
@@ -42,6 +52,10 @@ function LessonPracticePage() {
       setSentences(sentenceResponse.data.sentences);
 
       setActiveAttempt(attemptResponse.attempt);
+
+      if (progressResponse?.progress?.itemType === "assessment") {
+        setResumeAssessmentId(progressResponse.progress.itemId);
+      }
     } catch (error) {
       console.error(error);
 
@@ -57,11 +71,29 @@ function LessonPracticePage() {
   const handleStartPractice = async () => {
     try {
       const response = await startPracticeAttempt(lessonId);
+      if (sentences.length) {
+        // Best-effort resume pointer for the content half of the course
+        // stream — see the delivery notes for why this is lesson-block
+        // granularity today, not per-sentence.
+        updateCourseProgress(lessonId, "content", sentences[0].id).catch(() => {});
+      }
       navigate(
         `${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${response.attemptId}`,
       );
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const handleResumeOrStart = () => {
+    if (resumeAssessmentId) {
+      navigate(ROUTES.assessmentPlayer(lessonId, resumeAssessmentId));
+      return;
+    }
+    if (activeAttempt) {
+      navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${activeAttempt.id}`);
+    } else {
+      handleStartPractice();
     }
   };
   return (
@@ -74,18 +106,8 @@ function LessonPracticePage() {
         <button onClick={() => navigate(ROUTES.MENTEE_LESSONS)} className="...">
           ← Back to Lessons
         </button>
-        <PrimaryButton
-          onClick={() => {
-            if (activeAttempt) {
-              navigate(
-                `${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${activeAttempt.id}`,
-              );
-            } else {
-              handleStartPractice();
-            }
-          }}
-        >
-          {activeAttempt ? "Resume Practice" : "Start Practice"}
+        <PrimaryButton onClick={handleResumeOrStart}>
+          {resumeAssessmentId || activeAttempt ? "Resume Practice" : "Start Practice"}
         </PrimaryButton>
       </div>
       <div className="bg-white rounded-3xl shadow-sm p-6 mb-8">
@@ -225,18 +247,8 @@ function LessonPracticePage() {
             >
               Start Practice
             </button> */}
-            <PrimaryButton
-              onClick={() => {
-                if (activeAttempt) {
-                  navigate(
-                    `${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${activeAttempt.id}`,
-                  );
-                } else {
-                  handleStartPractice();
-                }
-              }}
-            >
-              {activeAttempt ? "Resume Practice" : "Start Practice"}
+            <PrimaryButton onClick={handleResumeOrStart}>
+              {resumeAssessmentId || activeAttempt ? "Resume Practice" : "Start Practice"}
             </PrimaryButton>
           </div>
         </div>

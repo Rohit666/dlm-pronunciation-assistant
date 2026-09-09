@@ -4,6 +4,8 @@ const router = express.Router();
 
 const lessonController = require("../controllers/lessonController");
 const exerciseController = require("../controllers/exerciseController");
+const topicController = require("../controllers/topicController");
+const courseStreamController = require("../controllers/courseStreamController");
 
 const { verifyToken } = require("../middleware/authMiddleware");
 
@@ -29,6 +31,24 @@ router.get(
   verifyToken,
   exerciseController.getLessonExercises,
 );
+
+// Hierarchical Content Tree — read side. Tree powers the mentor Tree
+// Explorer; stream/progress power the mentee unified sequential player.
+router.get("/:lessonId/tree", verifyToken, topicController.getCourseTree);
+router.get("/:lessonId/stream", verifyToken, courseStreamController.getStream);
+router.get(
+  "/:lessonId/progress",
+  verifyToken,
+  allowRoles("mentee"),
+  courseStreamController.getProgress,
+);
+router.post(
+  "/:lessonId/progress",
+  verifyToken,
+  allowRoles("mentee"),
+  courseStreamController.updateProgress,
+);
+
 router.put(
   "/:id",
   verifyToken,

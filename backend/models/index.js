@@ -53,6 +53,11 @@ db.ExerciseAttemptAnswer = require("./ExerciseAttemptAnswer")(
   sequelize,
   Sequelize.DataTypes,
 );
+db.Topic = require("./Topic")(sequelize, Sequelize.DataTypes);
+db.MenteeCourseProgress = require("./MenteeCourseProgress")(
+  sequelize,
+  Sequelize.DataTypes,
+);
 // Run associations
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Plus, FileText, ClipboardList } from "lucide-react";
+import { Plus, FileText, ClipboardList, GitBranch } from "lucide-react";
 
 import { useParams } from "react-router-dom";
 
@@ -36,16 +36,22 @@ import {
   getLessonExercises,
   deleteLessonExercise,
 } from "../../services/exerciseService";
+import { getCourseTree } from "../../services/courseStreamService";
+import TopicTreeExplorer from "../../features/topics/mentor/TopicTreeExplorer";
 
 function LessonDetailPage() {
   const navigate = useNavigate();
 
   const { lessonId } = useParams();
 
-  // "sentences" | "exercises" — the two content types a lesson can hold.
-  // Sentences (pronunciation practice) keep all their existing behavior
-  // below untouched; exercises are a new, parallel authoring surface.
+  // "sentences" | "exercises" | "structure". Sentences/exercises are the
+  // original flat tabs (untouched, list everything in the lesson
+  // regardless of topic); structure is the Hierarchical Content Tree
+  // explorer layered on top — an organizational + creation view, not a
+  // replacement for the flat lists.
   const [activeTab, setActiveTab] = useState("sentences");
+
+  const [tree, setTree] = useState(null);
 
   const [sentences, setSentences] = useState([]);
 
@@ -58,17 +64,22 @@ function LessonDetailPage() {
   const [exercises, setExercises] = useState([]);
   const [exercisesLoading, setExercisesLoading] = useState(true);
   const [exerciseDrawerOpen, setExerciseDrawerOpen] = useState(false);
+  const [exerciseDrawerTopicId, setExerciseDrawerTopicId] = useState(null);
   const [exerciseDeleteModal, setExerciseDeleteModal] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState(null);
 
   // Single shared drawer (Create + Edit) — see SentenceBlockBuilder for
   // the block editor itself. drawerMode picks which endpoint submit
   // hits; drawerBlocks/drawerOrder are the drawer's own controlled
-  // state, reused for both modes.
+  // state, reused for both modes. drawerTopicId is set only when the
+  // Tree Explorer's "+ Content" opens this drawer scoped to a topic —
+  // null means course root (and is always null when editing, since
+  // moving existing content between topics isn't wired into this drawer).
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState("create");
   const [drawerBlocks, setDrawerBlocks] = useState(defaultBlocks());
   const [drawerOrder, setDrawerOrder] = useState(1);
+  const [drawerTopicId, setDrawerTopicId] = useState(null);
   const [drawerSaving, setDrawerSaving] = useState(false);
 
   const fetchSentences = async () => {
@@ -105,9 +116,30 @@ function LessonDetailPage() {
     fetchExercises();
   }, []);
 
+  const fetchTree = async () => {
+    try {
+      const data = await getCourseTree(lessonId);
+      setTree(data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load content structure");
+    }
+  };
+
+  useEffect(() => {
+    fetchTree();
+  }, []);
+
   const handleExerciseCreated = () => {
     setExerciseDrawerOpen(false);
+    setExerciseDrawerTopicId(null);
     fetchExercises();
+    fetchTree();
+  };
+
+  const openAssessmentDrawer = (topicId = null) => {
+    setExerciseDrawerTopicId(topicId);
+    setExerciseDrawerOpen(true);
   };
 
   const handleDeleteExercise = async () => {
@@ -117,17 +149,19 @@ function LessonDetailPage() {
       setExerciseDeleteModal(false);
       setSelectedExercise(null);
       fetchExercises();
+      fetchTree();
     } catch (error) {
       console.error(error);
       toast.error("Delete failed");
     }
   };
 
-  const openCreateDrawer = () => {
+  const openCreateDrawer = (topicId = null) => {
     setDrawerMode("create");
     setSelectedSentence(null);
     setDrawerBlocks(defaultBlocks());
     setDrawerOrder(sentences.length + 1);
+    setDrawerTopicId(topicId);
     setDrawerOpen(true);
   };
 
@@ -136,12 +170,14 @@ function LessonDetailPage() {
     setSelectedSentence(sentence);
     setDrawerBlocks(blocksFromSentence(sentence, API_BASE_URL));
     setDrawerOrder(sentence.sentence_order);
+    setDrawerTopicId(null);
     setDrawerOpen(true);
   };
 
   const closeDrawer = () => {
     setDrawerOpen(false);
     setSelectedSentence(null);
+    setDrawerTopicId(null);
   };
 
   const handleDrawerSubmit = async (e) => {
@@ -157,6 +193,9 @@ function LessonDetailPage() {
 
       const formData = new FormData();
       formData.append("sentence_order", drawerOrder);
+      if (drawerMode === "create" && drawerTopicId) {
+        formData.append("topic_id", drawerTopicId);
+      }
       appendBlocksToFormData(formData, drawerBlocks);
 
       if (drawerMode === "create") {
@@ -173,6 +212,7 @@ function LessonDetailPage() {
 
       closeDrawer();
       fetchSentences();
+      fetchTree();
     } catch (error) {
       console.error(error);
 
@@ -195,6 +235,7 @@ function LessonDetailPage() {
       setDeleteModal(false);
 
       fetchSentences();
+      fetchTree();
     } catch (error) {
       console.error(error);
 
@@ -259,17 +300,18 @@ function LessonDetailPage() {
           <span>Back to Lessons</span>
         </button>
 
-        {activeTab === "sentences" ? (
+        {activeTab === "sentences" && (
           <button
-            onClick={openCreateDrawer}
+            onClick={() => openCreateDrawer()}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl transition-all duration-300 cursor-pointer"
           >
             <Plus size={18} />
             Add Sentence
           </button>
-        ) : (
+        )}
+        {activeTab === "exercises" && (
           <button
-            onClick={() => setExerciseDrawerOpen(true)}
+            onClick={() => openAssessmentDrawer()}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl transition-all duration-300 cursor-pointer"
           >
             <Plus size={18} />
@@ -300,6 +342,17 @@ function LessonDetailPage() {
         >
           <ClipboardList size={16} />
           Assessments &amp; Exercises
+        </button>
+        <button
+          onClick={() => setActiveTab("structure")}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 cursor-pointer ${
+            activeTab === "structure"
+              ? "bg-indigo-600 text-white"
+              : "text-gray-500 hover:bg-gray-100"
+          }`}
+        >
+          <GitBranch size={16} />
+          Structure
         </button>
       </div>
 
@@ -382,6 +435,16 @@ function LessonDetailPage() {
         </div>
       )}
 
+      {activeTab === "structure" && (
+        <TopicTreeExplorer
+          lessonId={lessonId}
+          tree={tree}
+          onRefresh={fetchTree}
+          onOpenContentDrawer={openCreateDrawer}
+          onOpenAssessmentDrawer={openAssessmentDrawer}
+        />
+      )}
+
       <FormDrawer
         open={drawerOpen}
         title={drawerMode === "create" ? "Add Sentence" : "Edit Sentence"}
@@ -444,7 +507,11 @@ function LessonDetailPage() {
       <ExerciseBuilderDrawer
         open={exerciseDrawerOpen}
         lessonId={lessonId}
-        onClose={() => setExerciseDrawerOpen(false)}
+        topicId={exerciseDrawerTopicId}
+        onClose={() => {
+          setExerciseDrawerOpen(false);
+          setExerciseDrawerTopicId(null);
+        }}
         onCreated={handleExerciseCreated}
       />
 

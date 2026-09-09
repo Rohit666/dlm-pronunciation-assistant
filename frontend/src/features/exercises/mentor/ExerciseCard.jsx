@@ -69,22 +69,56 @@ function ExerciseCard({ exercise, onDelete }) {
             <p className="text-sm text-gray-400">No questions added.</p>
           )}
 
-          {questions.map((question, index) => (
-            <div key={question.id} className="border border-gray-200 rounded-xl p-4 bg-white">
-              <div className="flex items-center justify-between mb-2 gap-2">
-                <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded-lg">
-                  Q{index + 1} · {QUESTION_TYPE_LABELS[question.question_type] || question.question_type}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {question.points} point{question.points === 1 ? "" : "s"}
-                </span>
+          {questions.map((question, index) => {
+            const isComprehension = question.question_type === "comprehension";
+            const subQuestions = question.content_payload?.sub_questions || [];
+            const totalPoints = isComprehension
+              ? subQuestions.reduce((sum, sub) => sum + (Number(sub.points) || 1), 0)
+              : question.points;
+
+            return (
+              <div key={question.id} className="border border-gray-200 rounded-xl p-4 bg-white">
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded-lg">
+                    Q{index + 1} · {QUESTION_TYPE_LABELS[question.question_type] || question.question_type}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {totalPoints} point{totalPoints === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                {isComprehension ? (
+                  <div className="space-y-3">
+                    {question.content_payload?.passage_html && (
+                      <div
+                        className="text-sm text-gray-700 prose prose-sm max-w-none bg-gray-50 rounded-lg p-3"
+                        dangerouslySetInnerHTML={{ __html: question.content_payload.passage_html }}
+                      />
+                    )}
+                    <div className="space-y-2">
+                      {subQuestions.map((sub, subIndex) => (
+                        <div key={sub.id} className="border border-gray-100 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-gray-400 mb-1">
+                            {subIndex + 1}. {QUESTION_TYPE_LABELS[sub.question_type] || sub.question_type} ·{" "}
+                            {sub.points} point{sub.points === 1 ? "" : "s"}
+                          </p>
+                          <div
+                            className="text-sm text-gray-700 prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: sub.prompt }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="text-sm text-gray-700 prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: question.prompt }}
+                  />
+                )}
               </div>
-              <div
-                className="text-sm text-gray-700 prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: question.prompt }}
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

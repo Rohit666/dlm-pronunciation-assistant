@@ -55,12 +55,48 @@ function createQuestion(questionType = QUESTION_TYPES.MCQ) {
       return { ...base, acceptableAnswersText: "", caseSensitive: false };
     case QUESTION_TYPES.SENTENCE_FORMATION:
       return { ...base, sentenceText: "" };
+    // Comprehension is composite — a passage plus its own nested list of
+    // auto-gradable sub-questions (mcq/true_false/fill_blank). It carries
+    // no `prompt`/`points` of its own in the shared editing shape below;
+    // QuestionCard skips the shared prompt/points row entirely for this
+    // type — see its render branch.
     case QUESTION_TYPES.COMPREHENSION:
-      return { ...base, passage: "", keywordsText: "", minWordCount: 20 };
+      return { ...base, passageHtml: "", subQuestions: [createSubQuestion()] };
     case QUESTION_TYPES.PARAGRAPH:
       return { ...base, keywordsText: "", minWordCount: 20 };
     default:
       return base;
+  }
+}
+
+const SUB_QUESTION_TYPE_OPTIONS = [
+  { value: QUESTION_TYPES.MCQ, label: "Multiple Choice" },
+  { value: QUESTION_TYPES.TRUE_FALSE, label: "True / False" },
+  { value: QUESTION_TYPES.FILL_BLANK, label: "Fill in the Blank" },
+];
+
+// A comprehension sub-question mirrors a top-level question's working
+// shape (minus points-as-shared, since points lives per sub-question
+// here too) but is restricted to the three auto-gradable types the
+// backend's gradeSubQuestion dispatch supports.
+function createSubQuestion(questionType = QUESTION_TYPES.MCQ) {
+  const base = { localId: nextLocalId(), question_type: questionType, points: 1, prompt: "" };
+  switch (questionType) {
+    case QUESTION_TYPES.TRUE_FALSE:
+      return {
+        ...base,
+        options: [
+          { id: "true", label: "True" },
+          { id: "false", label: "False" },
+        ],
+        correctOptionId: "true",
+        explanation: "",
+      };
+    case QUESTION_TYPES.FILL_BLANK:
+      return { ...base, acceptableAnswersText: "", caseSensitive: false };
+    case QUESTION_TYPES.MCQ:
+    default:
+      return { ...base, options: emptyChoiceOptions(), correctOptionId: "", explanation: "" };
   }
 }
 
@@ -118,7 +154,6 @@ function buildQuestionPayload(question, index) {
         grading_rubric: { expected_order: orderedTokens.map((t) => t.id) },
       };
     }
-    case QUESTION_TYPES.COMPREHENSION:
     case QUESTION_TYPES.PARAGRAPH: {
       const keywords = (question.keywordsText || "")
         .split(",")
@@ -126,14 +161,66 @@ function buildQuestionPayload(question, index) {
         .filter(Boolean);
       return {
         ...shared,
-        content_payload:
-          question.question_type === QUESTION_TYPES.COMPREHENSION
-            ? { passage: question.passage || "" }
-            : {},
+        content_payload: {},
         grading_rubric: {
           keywords,
           min_word_count: Number(question.minWordCount) || 0,
         },
+      };
+    }
+    case QUESTION_TYPES.COMPREHENSION: {
+      const subQuestions = (question.subQuestions || []).map(buildSubQuestionPayload);
+      return {
+        ...shared,
+        // The parent row's own points column is display-only for this
+        // type — grading always sums sub_questions[].points (see
+        // getQuestionMaxPoints in exerciseEvaluationService.js).
+        points: subQuestions.reduce((sum, sub) => sum + (Number(sub.points) || 1), 0) || 1,
+        content_payload: {
+          passage_html: question.passageHtml || "",
+          sub_questions: subQuestions,
+        },
+        grading_rubric: null,
+      };
+    }
+    default:
+      return shared;
+  }
+}
+
+// Maps one comprehension sub-question's working state to its embedded
+// payload shape — id/question_type/prompt/points/content_payload/
+// grading_rubric, same fields a top-level question has minus order_index.
+function buildSubQuestionPayload(subQuestion) {
+  const shared = {
+    id: String(subQuestion.localId),
+    question_type: subQuestion.question_type,
+    prompt: subQuestion.prompt,
+    points: Number(subQuestion.points) || 1,
+  };
+
+  switch (subQuestion.question_type) {
+    case QUESTION_TYPES.MCQ:
+    case QUESTION_TYPES.TRUE_FALSE:
+      return {
+        ...shared,
+        content_payload: {
+          options: subQuestion.options.map((option) => ({ id: option.id, label: option.label })),
+        },
+        grading_rubric: {
+          correct_option_id: subQuestion.correctOptionId,
+          explanation: subQuestion.explanation || undefined,
+        },
+      };
+    case QUESTION_TYPES.FILL_BLANK: {
+      const acceptableAnswers = (subQuestion.acceptableAnswersText || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return {
+        ...shared,
+        content_payload: { case_sensitive: subQuestion.caseSensitive },
+        grading_rubric: { acceptable_answers: acceptableAnswers },
       };
     }
     default:
@@ -271,18 +358,12 @@ function SentenceFormationEditor({ question, onChange }) {
   );
 }
 
+// Paragraph only now — comprehension moved to its own composite
+// ComprehensionEditor below (a passage plus nested auto-gradable
+// sub-questions, not a free-text keyword match).
 function OpenResponseEditor({ question, onChange }) {
   return (
     <div className="space-y-2">
-      {question.question_type === QUESTION_TYPES.COMPREHENSION && (
-        <textarea
-          rows={3}
-          value={question.passage}
-          onChange={(e) => onChange({ ...question, passage: e.target.value })}
-          placeholder="Reading passage"
-          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-      )}
       <input
         type="text"
         value={question.keywordsText}
@@ -299,6 +380,135 @@ function OpenResponseEditor({ question, onChange }) {
           onChange={(e) => onChange({ ...question, minWordCount: e.target.value })}
           className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
+      </div>
+    </div>
+  );
+}
+
+// One sub-question inside a comprehension block. Deliberately a lighter
+// version of QuestionCard — no reorder/points-header chrome, restricted
+// to the three auto-gradable types gradeSubQuestion supports.
+function SubQuestionCard({ subQuestion, index, onChange, onRemove, onTypeChange }) {
+  return (
+    <div className="border border-gray-200 rounded-xl p-3 bg-white">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-gray-100 text-gray-600 shrink-0">
+          Sub-question {index + 1}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="w-7 h-7 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center cursor-pointer shrink-0"
+          aria-label="Remove sub-question"
+        >
+          <Trash2 size={12} className="text-red-600" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 mb-2">
+        <select
+          value={subQuestion.question_type}
+          onChange={(e) => onTypeChange(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          {SUB_QUESTION_TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500 shrink-0">Points</label>
+          <input
+            type="number"
+            min="1"
+            value={subQuestion.points}
+            onChange={(e) => onChange({ ...subQuestion, points: e.target.value })}
+            className="w-16 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+
+      <div className="mb-2">
+        <RichTextEditor
+          value={subQuestion.prompt}
+          onChange={(html) => onChange({ ...subQuestion, prompt: html })}
+        />
+      </div>
+
+      {(subQuestion.question_type === QUESTION_TYPES.MCQ ||
+        subQuestion.question_type === QUESTION_TYPES.TRUE_FALSE) && (
+        <ChoiceOptionsEditor question={subQuestion} onChange={onChange} />
+      )}
+      {subQuestion.question_type === QUESTION_TYPES.FILL_BLANK && (
+        <FillBlankEditor question={subQuestion} onChange={onChange} />
+      )}
+    </div>
+  );
+}
+
+// Composite comprehension editor — a reading passage plus a nested,
+// independently-addable list of sub-questions. This is the whole point
+// of the comprehension refactor: it's a mini reading assessment, not a
+// single free-text drill (that's `paragraph`, unchanged).
+function ComprehensionEditor({ question, onChange }) {
+  const subQuestions = question.subQuestions || [];
+
+  const updateSubAt = (index, nextSub) => {
+    const next = subQuestions.slice();
+    next[index] = nextSub;
+    onChange({ ...question, subQuestions: next });
+  };
+
+  const changeSubType = (index, questionType) => {
+    const next = subQuestions.slice();
+    next[index] = { ...createSubQuestion(questionType), prompt: next[index].prompt };
+    onChange({ ...question, subQuestions: next });
+  };
+
+  const removeSubAt = (index) => {
+    onChange({ ...question, subQuestions: subQuestions.filter((_, i) => i !== index) });
+  };
+
+  const addSub = () => {
+    onChange({ ...question, subQuestions: [...subQuestions, createSubQuestion()] });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-xs font-semibold text-gray-500 mb-1">Reading passage</p>
+        <RichTextEditor
+          value={question.passageHtml}
+          onChange={(html) => onChange({ ...question, passageHtml: html })}
+        />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold text-gray-500">Sub-questions</p>
+          <span className="text-xs text-gray-400">{subQuestions.length} total</span>
+        </div>
+        <div className="space-y-3">
+          {subQuestions.map((subQuestion, index) => (
+            <SubQuestionCard
+              key={subQuestion.localId}
+              subQuestion={subQuestion}
+              index={index}
+              onChange={(next) => updateSubAt(index, next)}
+              onRemove={() => removeSubAt(index)}
+              onTypeChange={(type) => changeSubType(index, type)}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={addSub}
+          className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 text-gray-500 hover:bg-gray-50 py-2 rounded-xl text-sm font-semibold transition-all duration-300 cursor-pointer mt-3"
+        >
+          <Plus size={14} />
+          Add Sub-question
+        </button>
       </div>
     </div>
   );
@@ -341,7 +551,11 @@ function QuestionCard({ question, index, isFirst, isLast, onChange, onRemove, on
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-3">
+      <div
+        className={`grid grid-cols-1 gap-3 mb-3 ${
+          question.question_type === QUESTION_TYPES.COMPREHENSION ? "" : "sm:grid-cols-[1fr_auto]"
+        }`}
+      >
         <select
           value={question.question_type}
           onChange={(e) => onTypeChange(e.target.value)}
@@ -353,24 +567,32 @@ function QuestionCard({ question, index, isFirst, isLast, onChange, onRemove, on
             </option>
           ))}
         </select>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500 shrink-0">Points</label>
-          <input
-            type="number"
-            min="1"
-            value={question.points}
-            onChange={(e) => onChange({ ...question, points: e.target.value })}
-            className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
+        {/* Comprehension's points are derived from its sub-questions'
+            points (see buildQuestionPayload) — no manual points input. */}
+        {question.question_type !== QUESTION_TYPES.COMPREHENSION && (
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 shrink-0">Points</label>
+            <input
+              type="number"
+              min="1"
+              value={question.points}
+              onChange={(e) => onChange({ ...question, points: e.target.value })}
+              className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        )}
       </div>
 
-      <div className="mb-3">
-        <RichTextEditor
-          value={question.prompt}
-          onChange={(html) => onChange({ ...question, prompt: html })}
-        />
-      </div>
+      {/* Comprehension has no top-level prompt — ComprehensionEditor's
+          passage takes that role. */}
+      {question.question_type !== QUESTION_TYPES.COMPREHENSION && (
+        <div className="mb-3">
+          <RichTextEditor
+            value={question.prompt}
+            onChange={(html) => onChange({ ...question, prompt: html })}
+          />
+        </div>
+      )}
 
       {question.question_type === QUESTION_TYPES.MCQ && (
         <ChoiceOptionsEditor question={question} onChange={onChange} />
@@ -384,9 +606,11 @@ function QuestionCard({ question, index, isFirst, isLast, onChange, onRemove, on
       {question.question_type === QUESTION_TYPES.SENTENCE_FORMATION && (
         <SentenceFormationEditor question={question} onChange={onChange} />
       )}
-      {(question.question_type === QUESTION_TYPES.COMPREHENSION ||
-        question.question_type === QUESTION_TYPES.PARAGRAPH) && (
+      {question.question_type === QUESTION_TYPES.PARAGRAPH && (
         <OpenResponseEditor question={question} onChange={onChange} />
+      )}
+      {question.question_type === QUESTION_TYPES.COMPREHENSION && (
+        <ComprehensionEditor question={question} onChange={onChange} />
       )}
     </div>
   );
@@ -397,7 +621,10 @@ function QuestionCard({ question, index, isFirst, isLast, onChange, onRemove, on
 // own draft state and only reaches out to the API on submit, mirroring
 // SentenceBlockBuilder's "drawer edits a local draft" pattern rather
 // than syncing every keystroke to the parent.
-function ExerciseBuilderDrawer({ open, lessonId, onClose, onCreated }) {
+// topicId — Hierarchical Content Tree: omit/null to author at the
+// course root, pass a topic id to scope this exercise inside that
+// topic/sub-topic (set by TopicTreeExplorer's "+ Assessment" action).
+function ExerciseBuilderDrawer({ open, lessonId, topicId, onClose, onCreated }) {
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [passingPercentage, setPassingPercentage] = useState(70);
@@ -463,6 +690,7 @@ function ExerciseBuilderDrawer({ open, lessonId, onClose, onCreated }) {
         title,
         instructions,
         passing_percentage: Number(passingPercentage) || 70,
+        topic_id: topicId || null,
         questions: questions.map((question, index) => buildQuestionPayload(question, index)),
       };
 

@@ -5,6 +5,7 @@ import PageHeader from "../../components/PageHeader";
 import PrimaryButton from "../../components/common/PrimaryButton";
 import SecondaryButton from "../../components/common/SecondaryButton";
 import { getPracticeAttempt } from "../../services/practiceAttemptService";
+import { getCourseStream } from "../../services/courseStreamService";
 import { ROUTES } from "../../constants/routes";
 
 // Self-paced (Requirement 1.1): completion no longer waits on mentor
@@ -19,14 +20,37 @@ function PracticeCompletePage() {
   const navigate = useNavigate();
   const { lessonId, attemptId } = useParams();
   const [attempt, setAttempt] = useState(null);
+  // Hierarchical Content Tree — auto-advance seam. All of this lesson's
+  // sentences are one attempt (see the delivery notes on why per-
+  // sentence stream interleaving isn't wired yet), so the natural place
+  // to check "what's next in the course stream" is right here, once
+  // that whole content block is done.
+  const [nextStreamItem, setNextStreamItem] = useState(null);
   useEffect(() => {
     loadAttempt();
+    loadNextStreamItem();
   }, []);
   const loadAttempt = async () => {
     try {
       const response = await getPracticeAttempt(attemptId);
 
       setAttempt(response.attempt);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const loadNextStreamItem = async () => {
+    try {
+      const stream = await getCourseStream(lessonId);
+      const contentIndexes = stream
+        .map((entry, index) => (entry.item_type === "content" ? index : -1))
+        .filter((index) => index !== -1);
+      if (contentIndexes.length === 0) return;
+      const lastContentIndex = Math.max(...contentIndexes);
+      if (lastContentIndex < stream.length - 1) {
+        setNextStreamItem(stream[lastContentIndex + 1]);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -117,11 +141,19 @@ function PracticeCompletePage() {
               Back To Lessons
             </SecondaryButton>
 
-            <PrimaryButton
+            <SecondaryButton
               onClick={() => navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}`)}
             >
               Practice Again
-            </PrimaryButton>
+            </SecondaryButton>
+
+            {passed && nextStreamItem?.item_type === "assessment" && (
+              <PrimaryButton
+                onClick={() => navigate(ROUTES.assessmentPlayer(lessonId, nextStreamItem.id))}
+              >
+                Continue to Next
+              </PrimaryButton>
+            )}
           </div>
         </div>
       </div>

@@ -75,6 +75,15 @@ module.exports = (sequelize, DataTypes) => {
     Lesson.hasMany(models.LessonExercise, {
       foreignKey: "lesson_id",
     });
+    // Hierarchical Content Tree — this Lesson row plays "course"; see
+    // backend/migrations/20260910090000-hierarchical-content-tree.js.
+    Lesson.hasMany(models.Topic, {
+      foreignKey: "course_id",
+      as: "topics",
+    });
+    Lesson.hasMany(models.MenteeCourseProgress, {
+      foreignKey: "course_id",
+    });
   };
   return Lesson;
 };

@@ -4,6 +4,12 @@ const exerciseController = require("../controllers/exerciseController");
 const { verifyToken } = require("../middleware/authMiddleware");
 const { allowRoles } = require("../middleware/roleMiddleware");
 
+router.get(
+  "/:exerciseId",
+  verifyToken,
+  exerciseController.getExerciseById,
+);
+
 router.post(
   "/:exerciseId/submit",
   verifyToken,

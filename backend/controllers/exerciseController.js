@@ -8,9 +8,36 @@ const {
 } = require("../models");
 const exerciseEvaluationService = require("../services/exerciseEvaluationService");
 const { sanitizeBlockText } = require("../utils/sentenceBlocks");
+const QUESTION_TYPES = require("../constants/exerciseQuestionTypes");
 
 async function resolveMentee(userId) {
   return Mentee.findOne({ where: { user_id: userId } });
+}
+
+// Comprehension's content_payload nests its own rich-text HTML
+// (passage_html, plus one prompt per sub-question) — sanitize every one
+// of those before it reaches the DB, same discipline as the top-level
+// `prompt` column below. Missed here, this HTML would round-trip
+// straight into another user's dangerouslySetInnerHTML unsanitized.
+function sanitizeQuestionContentPayload(questionType, contentPayload) {
+  if (!contentPayload) return contentPayload;
+
+  if (questionType === QUESTION_TYPES.COMPREHENSION) {
+    return {
+      ...contentPayload,
+      passage_html: contentPayload.passage_html
+        ? sanitizeBlockText(contentPayload.passage_html)
+        : contentPayload.passage_html,
+      sub_questions: Array.isArray(contentPayload.sub_questions)
+        ? contentPayload.sub_questions.map((sub) => ({
+            ...sub,
+            prompt: sanitizeBlockText(sub.prompt || ""),
+          }))
+        : contentPayload.sub_questions,
+    };
+  }
+
+  return contentPayload;
 }
 
 // GET /api/lessons/:lessonId/exercises
@@ -126,6 +153,7 @@ exports.createExercise = async (req, res) => {
       instructions,
       passing_percentage,
       order_index,
+      topic_id,
       questions,
     } = req.body;
 
@@ -142,6 +170,7 @@ exports.createExercise = async (req, res) => {
       const exercise = await LessonExercise.create(
         {
           lesson_id: lessonId,
+          topic_id: topic_id || null,
           title,
           instructions: instructions ? sanitizeBlockText(instructions) : null,
           passing_percentage: passing_percentage ?? 70.0,
@@ -157,7 +186,10 @@ exports.createExercise = async (req, res) => {
             exercise_id: exercise.id,
             question_type: question.question_type,
             prompt: sanitizeBlockText(question.prompt || ""),
-            content_payload: question.content_payload || null,
+            content_payload: sanitizeQuestionContentPayload(
+              question.question_type,
+              question.content_payload || null,
+            ),
             grading_rubric: question.grading_rubric || null,
             points: question.points ?? 1,
             order_index: question.order_index ?? index + 1,
@@ -173,6 +205,46 @@ exports.createExercise = async (req, res) => {
       success: true,
       message: "Exercise created successfully",
       exercise: result,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/exercises/:exerciseId — single exercise, used by the
+// full-width AssessmentPlayerPage (which lands on a direct route, not a
+// list). Same grading_rubric-stripping rule as getLessonExercises.
+exports.getExerciseById = async (req, res) => {
+  try {
+    const { exerciseId } = req.params;
+
+    const exercise = await LessonExercise.findByPk(exerciseId, {
+      include: [
+        {
+          model: ExerciseQuestion,
+          as: "questions",
+          separate: true,
+          order: [["order_index", "ASC"]],
+        },
+      ],
+    });
+
+    if (!exercise) {
+      return res.status(404).json({ success: false, message: "Exercise not found" });
+    }
+
+    const stripRubric = req.user?.role === "mentee";
+    const exerciseJson = exercise.toJSON();
+
+    res.json({
+      success: true,
+      exercise: {
+        ...exerciseJson,
+        questions: exerciseJson.questions.map((question) =>
+          stripRubric ? { ...question, grading_rubric: undefined } : question,
+        ),
+      },
     });
   } catch (error) {
     console.error(error);

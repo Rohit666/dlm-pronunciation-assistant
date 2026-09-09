@@ -25,4 +25,9 @@ export const ROUTES = {
     `/mentee/practice/${lessonId}/player/${attemptId}/loading`,
   pronunciationAssessment: (lessonId, attemptId) =>
     `/mentee/practice/${lessonId}/player/${attemptId}/pronunciation-assessment`,
+
+  // Hierarchical Content Tree — full-width assessment player (replaces
+  // the old modal popup, ExercisePlayerModal.jsx, now deprecated).
+  assessmentPlayer: (lessonId, exerciseId) =>
+    `/mentee/practice/${lessonId}/assessment/${exerciseId}`,
 };

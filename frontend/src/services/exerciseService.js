@@ -5,6 +5,13 @@ export const getLessonExercises = async (lessonId) => {
   return response.data.exercises;
 };
 
+// Single-exercise fetch — the full-width AssessmentPlayerPage lands on
+// a direct route (no lesson-scoped list available there).
+export const getExercise = async (exerciseId) => {
+  const response = await api.get(`/exercises/${exerciseId}`);
+  return response.data.exercise;
+};
+
 export const submitExercise = async (exerciseId, answers) => {
   const response = await api.post(`/exercises/${exerciseId}/submit`, { answers });
   return response.data;
