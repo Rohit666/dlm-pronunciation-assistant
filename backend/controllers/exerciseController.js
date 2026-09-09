@@ -46,11 +46,18 @@ function sanitizeQuestionContentPayload(questionType, contentPayload) {
 // whatever the client happened to send — Bug 3 fix, so a direct API
 // call can't desync the stored `points` column from what grading
 // actually awards.
-function computeQuestionPoints(questionType, sanitizedContentPayload, clientPoints) {
+function computeQuestionPoints(
+  questionType,
+  sanitizedContentPayload,
+  clientPoints,
+) {
   if (questionType === QUESTION_TYPES.COMPREHENSION) {
     const subQuestions = sanitizedContentPayload?.sub_questions || [];
     if (subQuestions.length) {
-      return subQuestions.reduce((sum, sub) => sum + (Number(sub.points) || 1), 0);
+      return subQuestions.reduce(
+        (sum, sub) => sum + (Number(sub.points) || 1),
+        0,
+      );
     }
   }
   return clientPoints ?? 1;
@@ -61,6 +68,34 @@ function computeQuestionPoints(questionType, sanitizedContentPayload, clientPoin
 // admin get it back (needed to review/edit exercises), gated only by
 // verifyToken here since lesson-management routes already gate creation
 // by role; reading a lesson's own exercises is not sensitive by role.
+const parseQuestionFields = (q) => {
+  const item = q.toJSON ? q.toJSON() : q;
+  let contentPayload = item.content_payload;
+  let gradingRubric = item.grading_rubric;
+
+  if (typeof contentPayload === "string") {
+    try {
+      contentPayload = JSON.parse(contentPayload || "{}");
+    } catch {
+      contentPayload = {};
+    }
+  }
+
+  if (typeof gradingRubric === "string") {
+    try {
+      gradingRubric = JSON.parse(gradingRubric || "{}");
+    } catch {
+      gradingRubric = null;
+    }
+  }
+
+  return {
+    ...item,
+    content_payload: contentPayload,
+    grading_rubric: gradingRubric,
+  };
+};
+
 exports.getLessonExercises = async (req, res) => {
   try {
     const { lessonId } = req.params;
@@ -84,11 +119,12 @@ exports.getLessonExercises = async (req, res) => {
       const exerciseJson = exercise.toJSON();
       return {
         ...exerciseJson,
-        questions: exerciseJson.questions.map((question) =>
-          stripRubric
-            ? { ...question, grading_rubric: undefined }
-            : question,
-        ),
+        questions: (exerciseJson.questions || []).map((rawQuestion) => {
+          const parsedQuestion = parseQuestionFields(rawQuestion);
+          return stripRubric
+            ? { ...parsedQuestion, grading_rubric: undefined }
+            : parsedQuestion;
+        }),
       };
     });
 
@@ -107,12 +143,16 @@ exports.submitExercise = async (req, res) => {
     const { answers } = req.body;
 
     if (!Array.isArray(answers)) {
-      return res.status(400).json({ success: false, message: "answers must be an array" });
+      return res
+        .status(400)
+        .json({ success: false, message: "answers must be an array" });
     }
 
     const mentee = await resolveMentee(req.user.id);
     if (!mentee) {
-      return res.status(404).json({ success: false, message: "Mentee not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Mentee not found" });
     }
 
     const result = await exerciseEvaluationService.submitExerciseAttempt({
@@ -140,7 +180,9 @@ exports.getExerciseAttempts = async (req, res) => {
 
     const mentee = await resolveMentee(req.user.id);
     if (!mentee) {
-      return res.status(404).json({ success: false, message: "Mentee not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Mentee not found" });
     }
 
     const attempts = await ExerciseAttempt.findAll({
@@ -175,11 +217,15 @@ exports.createExercise = async (req, res) => {
 
     const lesson = await Lesson.findByPk(lessonId);
     if (!lesson) {
-      return res.status(404).json({ success: false, message: "Lesson not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Lesson not found" });
     }
 
     if (!title) {
-      return res.status(400).json({ success: false, message: "title is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "title is required" });
     }
 
     const result = await sequelize.transaction(async (transaction) => {
@@ -254,7 +300,9 @@ exports.getExerciseById = async (req, res) => {
     });
 
     if (!exercise) {
-      return res.status(404).json({ success: false, message: "Exercise not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Exercise not found" });
     }
 
     const stripRubric = req.user?.role === "mentee";
@@ -264,9 +312,12 @@ exports.getExerciseById = async (req, res) => {
       success: true,
       exercise: {
         ...exerciseJson,
-        questions: exerciseJson.questions.map((question) =>
-          stripRubric ? { ...question, grading_rubric: undefined } : question,
-        ),
+        questions: exerciseJson.questions.map((rawQuestion) => {
+          const parsedQuestion = parseQuestionFields(rawQuestion);
+          return stripRubric
+            ? { ...parsedQuestion, grading_rubric: undefined }
+            : parsedQuestion;
+        }),
       },
     });
   } catch (error) {
@@ -285,7 +336,9 @@ exports.deleteExercise = async (req, res) => {
 
     const exercise = await LessonExercise.findByPk(exerciseId);
     if (!exercise) {
-      return res.status(404).json({ success: false, message: "Exercise not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Exercise not found" });
     }
 
     await exercise.destroy();

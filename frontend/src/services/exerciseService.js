@@ -13,7 +13,9 @@ export const getExercise = async (exerciseId) => {
 };
 
 export const submitExercise = async (exerciseId, answers) => {
-  const response = await api.post(`/exercises/${exerciseId}/submit`, { answers });
+  const response = await api.post(`/exercises/${exerciseId}/submit`, {
+    answers,
+  });
   return response.data;
 };
 
@@ -24,7 +26,10 @@ export const getExerciseAttempts = async (exerciseId) => {
 
 // Mentor authoring — POST /api/mentor/lessons/:lessonId/exercises.
 export const createLessonExercise = async (lessonId, payload) => {
-  const response = await api.post(`/mentor/lessons/${lessonId}/exercises`, payload);
+  const response = await api.post(
+    `/mentor/lessons/${lessonId}/exercises`,
+    payload,
+  );
   return response.data;
 };
 

@@ -104,6 +104,7 @@ function LessonDetailPage() {
       setExercisesLoading(true);
       const data = await getLessonExercises(lessonId);
       setExercises(data);
+      console.log("Fetched exercises:", data);
     } catch (error) {
       console.error(error);
       toast.error("Failed to load exercises");
@@ -366,7 +367,10 @@ function LessonDetailPage() {
             </div>
           </div>
 
-          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
             {!loading && sentences.length === 0 && (
               <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
                 <h3 className="text-2xl font-bold text-gray-700 mb-3">
