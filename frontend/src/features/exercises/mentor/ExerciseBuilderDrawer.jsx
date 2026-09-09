@@ -436,9 +436,11 @@ function SubQuestionCard({ subQuestion, index, onChange, onRemove, onTypeChange 
         />
       </div>
 
-      {(subQuestion.question_type === QUESTION_TYPES.MCQ ||
-        subQuestion.question_type === QUESTION_TYPES.TRUE_FALSE) && (
+      {subQuestion.question_type === QUESTION_TYPES.MCQ && (
         <ChoiceOptionsEditor question={subQuestion} onChange={onChange} />
+      )}
+      {subQuestion.question_type === QUESTION_TYPES.TRUE_FALSE && (
+        <TrueFalseEditor question={subQuestion} onChange={onChange} />
       )}
       {subQuestion.question_type === QUESTION_TYPES.FILL_BLANK && (
         <FillBlankEditor question={subQuestion} onChange={onChange} />

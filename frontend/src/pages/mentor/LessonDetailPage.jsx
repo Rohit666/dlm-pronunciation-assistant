@@ -356,7 +356,7 @@ function LessonDetailPage() {
         </button>
       </div>
 
-      {activeTab === "sentences" ? (
+      {activeTab === "sentences" && (
         <div className="bg-white rounded-3xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Sentences</h2>
@@ -398,7 +398,9 @@ function LessonDetailPage() {
             </SortableContext>
           </DndContext>
         </div>
-      ) : (
+      )}
+
+      {activeTab === "exercises" && (
         <div className="bg-white rounded-3xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Assessments &amp; Exercises</h2>
@@ -436,13 +438,15 @@ function LessonDetailPage() {
       )}
 
       {activeTab === "structure" && (
-        <TopicTreeExplorer
-          lessonId={lessonId}
-          tree={tree}
-          onRefresh={fetchTree}
-          onOpenContentDrawer={openCreateDrawer}
-          onOpenAssessmentDrawer={openAssessmentDrawer}
-        />
+        <div className="mt-6">
+          <TopicTreeExplorer
+            lessonId={lessonId}
+            tree={tree}
+            onRefresh={fetchTree}
+            onOpenContentDrawer={openCreateDrawer}
+            onOpenAssessmentDrawer={openAssessmentDrawer}
+          />
+        </div>
       )}
 
       <FormDrawer

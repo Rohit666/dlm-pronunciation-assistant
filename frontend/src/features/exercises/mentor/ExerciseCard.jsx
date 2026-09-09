@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Trash2, ClipboardList } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, ClipboardList, CheckCircle2 } from "lucide-react";
 
 const QUESTION_TYPE_LABELS = {
   mcq: "Multiple Choice",
@@ -10,12 +10,101 @@ const QUESTION_TYPE_LABELS = {
   paragraph: "Paragraph Writing",
 };
 
+// Bug 3 fix: this used to render only `prompt` — the mentor could never
+// actually see what was saved as the answer key, which read as "nothing
+// was persisted" even though it was. This renders the full answer key
+// per question_type from content_payload/grading_rubric (never stripped
+// for mentor/admin — see exerciseController.getLessonExercises). Shared
+// by both top-level questions and comprehension's nested sub-questions,
+// since both carry the same {question_type, content_payload,
+// grading_rubric, points} shape.
+function AnswerKey({ question }) {
+  const rubric = question.grading_rubric || {};
+  const payload = question.content_payload || {};
+
+  switch (question.question_type) {
+    case "mcq":
+    case "true_false": {
+      const options = payload.options || [];
+      return (
+        <div className="space-y-1.5 mt-2">
+          {options.map((option) => {
+            const isCorrect = String(option.id) === String(rubric.correct_option_id);
+            return (
+              <div
+                key={option.id}
+                className={`flex items-center gap-2 text-sm rounded-lg px-3 py-1.5 ${
+                  isCorrect ? "bg-green-50 text-green-800 font-medium" : "text-gray-600"
+                }`}
+              >
+                {isCorrect ? (
+                  <CheckCircle2 size={14} className="text-green-600 shrink-0" />
+                ) : (
+                  <span className="w-3.5 shrink-0" />
+                )}
+                {option.label}
+              </div>
+            );
+          })}
+          {rubric.explanation && (
+            <p className="text-xs text-gray-400 mt-1">Explanation: {rubric.explanation}</p>
+          )}
+        </div>
+      );
+    }
+    case "fill_blank": {
+      const answers = rubric.acceptable_answers || [];
+      return (
+        <div className="mt-2">
+          <p className="text-xs font-semibold text-gray-400 mb-1">Accepted answers</p>
+          <div className="flex flex-wrap gap-1.5">
+            {answers.length ? (
+              answers.map((answer, i) => (
+                <span
+                  key={`${answer}-${i}`}
+                  className="text-xs font-medium bg-green-50 text-green-800 px-2 py-1 rounded-lg"
+                >
+                  {answer}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-gray-400">No accepted answers saved.</span>
+            )}
+          </div>
+        </div>
+      );
+    }
+    case "sentence_formation": {
+      const tokensById = new Map((payload.tokens || []).map((t) => [String(t.id), t.text]));
+      const expectedOrder = rubric.expected_order || [];
+      const sentence = expectedOrder.map((id) => tokensById.get(String(id)) || "?").join(" ");
+      return (
+        <div className="mt-2">
+          <p className="text-xs font-semibold text-gray-400 mb-1">Correct order</p>
+          <p className="text-sm font-medium bg-green-50 text-green-800 px-3 py-2 rounded-lg inline-block">
+            {sentence || "(no answer saved)"}
+          </p>
+        </div>
+      );
+    }
+    case "paragraph": {
+      const keywords = rubric.keywords || [];
+      return (
+        <div className="mt-2 text-xs text-gray-500 space-y-1">
+          {keywords.length > 0 && <p>Expected keywords: {keywords.join(", ")}</p>}
+          {rubric.min_word_count > 0 && <p>Minimum word count: {rubric.min_word_count}</p>}
+        </div>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
 // Mentor-facing exercise summary card. "View" is an inline expand —
-// shows each question's type/points/prompt — rather than launching the
-// mentee-facing ExercisePlayerModal, since that modal submits attempts
-// and has no read-only mode. Delete just raises onDelete(exercise);
-// the confirm step lives in the parent (mirrors sentence deletion's
-// ConfirmModal pattern in the same page).
+// shows each question's full prompt + answer key — rather than
+// launching the mentee-facing AssessmentPlayerPage, which submits real
+// attempts and has no read-only mode.
 function ExerciseCard({ exercise, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const questions = exercise.questions || [];
@@ -72,8 +161,16 @@ function ExerciseCard({ exercise, onDelete }) {
           {questions.map((question, index) => {
             const isComprehension = question.question_type === "comprehension";
             const subQuestions = question.content_payload?.sub_questions || [];
+            // Comprehension's real max is the sum of its sub-questions'
+            // points (see getQuestionMaxPoints in
+            // exerciseEvaluationService.js) — fall back to the stored
+            // `points` column only for legacy rows authored before the
+            // composite refactor (no sub_questions saved), so this never
+            // silently shows 0.
             const totalPoints = isComprehension
-              ? subQuestions.reduce((sum, sub) => sum + (Number(sub.points) || 1), 0)
+              ? subQuestions.length
+                ? subQuestions.reduce((sum, sub) => sum + (Number(sub.points) || 1), 0)
+                : question.points
               : question.points;
 
             return (
@@ -89,12 +186,27 @@ function ExerciseCard({ exercise, onDelete }) {
 
                 {isComprehension ? (
                   <div className="space-y-3">
-                    {question.content_payload?.passage_html && (
-                      <div
-                        className="text-sm text-gray-700 prose prose-sm max-w-none bg-gray-50 rounded-lg p-3"
-                        dangerouslySetInnerHTML={{ __html: question.content_payload.passage_html }}
-                      />
+                    {payloadHasPassage(question) ? (
+                      <div className="border-l-4 border-indigo-300 bg-indigo-50/60 rounded-r-lg p-3">
+                        <p className="text-xs font-semibold text-indigo-400 mb-1 uppercase tracking-wide">
+                          Reading Passage
+                        </p>
+                        <div
+                          className="text-sm text-gray-700 prose prose-sm max-w-none"
+                          dangerouslySetInnerHTML={{ __html: question.content_payload.passage_html }}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400">No passage saved.</p>
                     )}
+
+                    {subQuestions.length === 0 && (
+                      <p className="text-xs text-amber-600">
+                        No sub-questions saved — this looks like a legacy comprehension question
+                        authored before the composite format. Re-author it in the builder.
+                      </p>
+                    )}
+
                     <div className="space-y-2">
                       {subQuestions.map((sub, subIndex) => (
                         <div key={sub.id} className="border border-gray-100 rounded-lg p-3">
@@ -106,15 +218,19 @@ function ExerciseCard({ exercise, onDelete }) {
                             className="text-sm text-gray-700 prose prose-sm max-w-none"
                             dangerouslySetInnerHTML={{ __html: sub.prompt }}
                           />
+                          <AnswerKey question={sub} />
                         </div>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div
-                    className="text-sm text-gray-700 prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: question.prompt }}
-                  />
+                  <div>
+                    <div
+                      className="text-sm text-gray-700 prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: question.prompt }}
+                    />
+                    <AnswerKey question={question} />
+                  </div>
                 )}
               </div>
             );
@@ -123,6 +239,10 @@ function ExerciseCard({ exercise, onDelete }) {
       )}
     </div>
   );
+}
+
+function payloadHasPassage(question) {
+  return Boolean(question.content_payload?.passage_html);
 }
 
 export default ExerciseCard;

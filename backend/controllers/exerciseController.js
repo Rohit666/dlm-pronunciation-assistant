@@ -40,6 +40,22 @@ function sanitizeQuestionContentPayload(questionType, contentPayload) {
   return contentPayload;
 }
 
+// Server-authoritative points, mirroring getQuestionMaxPoints in
+// exerciseEvaluationService.js: comprehension's real point value is
+// always the sum of its (already-sanitized) sub_questions, never
+// whatever the client happened to send — Bug 3 fix, so a direct API
+// call can't desync the stored `points` column from what grading
+// actually awards.
+function computeQuestionPoints(questionType, sanitizedContentPayload, clientPoints) {
+  if (questionType === QUESTION_TYPES.COMPREHENSION) {
+    const subQuestions = sanitizedContentPayload?.sub_questions || [];
+    if (subQuestions.length) {
+      return subQuestions.reduce((sum, sub) => sum + (Number(sub.points) || 1), 0);
+    }
+  }
+  return clientPoints ?? 1;
+}
+
 // GET /api/lessons/:lessonId/exercises
 // grading_rubric is stripped for mentees — it's the answer key. Mentor/
 // admin get it back (needed to review/edit exercises), gated only by
@@ -182,18 +198,25 @@ exports.createExercise = async (req, res) => {
       const questionRows = Array.isArray(questions) ? questions : [];
       if (questionRows.length) {
         await ExerciseQuestion.bulkCreate(
-          questionRows.map((question, index) => ({
-            exercise_id: exercise.id,
-            question_type: question.question_type,
-            prompt: sanitizeBlockText(question.prompt || ""),
-            content_payload: sanitizeQuestionContentPayload(
+          questionRows.map((question, index) => {
+            const sanitizedContentPayload = sanitizeQuestionContentPayload(
               question.question_type,
               question.content_payload || null,
-            ),
-            grading_rubric: question.grading_rubric || null,
-            points: question.points ?? 1,
-            order_index: question.order_index ?? index + 1,
-          })),
+            );
+            return {
+              exercise_id: exercise.id,
+              question_type: question.question_type,
+              prompt: sanitizeBlockText(question.prompt || ""),
+              content_payload: sanitizedContentPayload,
+              grading_rubric: question.grading_rubric || null,
+              points: computeQuestionPoints(
+                question.question_type,
+                sanitizedContentPayload,
+                question.points,
+              ),
+              order_index: question.order_index ?? index + 1,
+            };
+          }),
           { transaction },
         );
       }
