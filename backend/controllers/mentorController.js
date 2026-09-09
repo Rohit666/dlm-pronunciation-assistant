@@ -23,6 +23,56 @@ exports.getMentorBatches = async (req, res) => {
     });
   }
 };
+exports.updateBatchThreshold = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { default_passing_threshold } = req.body;
+
+    const threshold = Number(default_passing_threshold);
+
+    if (
+      default_passing_threshold === null ||
+      default_passing_threshold === undefined ||
+      Number.isNaN(threshold) ||
+      threshold < 0 ||
+      threshold > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "default_passing_threshold must be a number between 0 and 100",
+      });
+    }
+
+    const batch = await Batch.findOne({
+      where: {
+        id,
+        mentor_id: req.user.id,
+      },
+    });
+
+    if (!batch) {
+      return res.status(404).json({
+        success: false,
+        message: "Batch not found",
+      });
+    }
+
+    batch.default_passing_threshold = threshold;
+    await batch.save();
+
+    res.json({
+      success: true,
+      batch,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
 exports.getMentorMentees = async (req, res) => {
   try {
     const { page, limit } = req.query;

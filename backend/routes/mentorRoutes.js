@@ -22,4 +22,11 @@ router.get(
   mentorController.getMentorMentees,
 );
 
+router.put(
+  "/batches/:id/threshold",
+  verifyToken,
+  allowRoles("mentor"),
+  mentorController.updateBatchThreshold,
+);
+
 module.exports = router;
