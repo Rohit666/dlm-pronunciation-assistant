@@ -45,6 +45,9 @@ module.exports = (sequelize, DataTypes) => {
     Mentee.hasMany(models.StudentPhonemeStat, {
       foreignKey: "mentee_id",
     });
+    Mentee.hasMany(models.StudentProgression, {
+      foreignKey: "mentee_id",
+    });
   };
 
   return Mentee;

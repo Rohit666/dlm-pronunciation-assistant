@@ -1,4 +1,5 @@
 const {
+  sequelize,
   PracticeSession,
   Mentee,
   LessonSentence,
@@ -10,6 +11,7 @@ const {
 const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses");
 const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 const REVIEW_STATUSES = require("../constants/reviewStatuses");
+const progressionService = require("../services/progressionService");
 exports.getReviewAttempts = async (req, res) => {
   try {
     const mentorId = req.user.id;
@@ -137,42 +139,63 @@ exports.saveAttemptReview = async (req, res) => {
 
     const mentorId = req.user.id;
 
-    // Save sentence reviews
-    for (const review of sentenceReviews) {
-      await PracticeSession.update(
-        {
-          score: review.score,
-          feedback: review.feedback,
-          reviewed_by: mentorId,
-          reviewed_at: new Date(),
-        },
-        {
-          where: {
-            id: review.sessionId,
+    // Saving the review, finalizing overall_score, and evaluating
+    // progression all have to land together or not at all — a mentee
+    // must never be advanced without the score that justified it, nor
+    // have a score saved that silently failed to advance them.
+    const progressionResult = await sequelize.transaction(async (transaction) => {
+      // Save sentence reviews
+      for (const review of sentenceReviews) {
+        await PracticeSession.update(
+          {
+            score: review.score,
+            feedback: review.feedback,
+            reviewed_by: mentorId,
+            reviewed_at: new Date(),
           },
-        },
-      );
-    }
-    const updateData = {
-      overall_score: overallScore,
-      overall_feedback: overallFeedback,
-      reviewed_by: mentorId,
-      reviewed_at: new Date(),
-      review_status: REVIEW_STATUSES.REVIEWED,
-    };
-    const attempt = await PracticeAttempt.findByPk(id);
-    if (!attempt.first_reviewed_at) {
-      updateData.first_reviewed_at = new Date();
-    }
-    await PracticeAttempt.update(updateData, {
-      where: {
-        id,
-      },
+          {
+            where: {
+              id: review.sessionId,
+            },
+            transaction,
+          },
+        );
+      }
+
+      const attempt = await PracticeAttempt.findByPk(id, { transaction });
+      if (!attempt) {
+        throw new Error("Attempt not found");
+      }
+
+      const updateData = {
+        overall_score: overallScore,
+        overall_feedback: overallFeedback,
+        reviewed_by: mentorId,
+        reviewed_at: new Date(),
+        review_status: REVIEW_STATUSES.REVIEWED,
+      };
+      if (!attempt.first_reviewed_at) {
+        updateData.first_reviewed_at = new Date();
+      }
+      await attempt.update(updateData, { transaction });
+
+      // Threshold = lesson.passing_score ?? batch.default_passing_threshold
+      // ?? 70.00 — resolved and applied in progressionService.js, not here.
+      return progressionService.evaluateLessonCompletion({
+        menteeId: attempt.mentee_id,
+        lessonId: attempt.lesson_id,
+        overallScore,
+        transaction,
+      });
     });
 
     res.json({
       success: true,
       message: "Review saved successfully",
+      progression: {
+        passed: progressionResult.passed,
+        threshold: progressionResult.threshold,
+      },
     });
   } catch (error) {
     console.error(error);

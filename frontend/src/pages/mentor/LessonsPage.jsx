@@ -29,6 +29,11 @@ import MultiCheckboxSelector from "../../components/forms/MultiCheckboxSelector"
 import { LESSON_OUTCOMES } from "../../constants/lessonOutcomes";
 import { TARGET_SKILLS } from "../../constants/targetSkills";
 import { parseJsonArray } from "../../utils/jsonUtils";
+import {
+  PROGRESSION_LEVEL_OPTIONS,
+  parseProgressionLevelOption,
+  toProgressionLevelOption,
+} from "../../constants/progressionFrameworks";
 
 function LessonsPage() {
   const navigate = useNavigate();
@@ -95,6 +100,12 @@ function LessonsPage() {
       formData.append("estimated_duration", data.estimated_duration);
       formData.append("lesson_outcomes", JSON.stringify(lessonOutcomes));
       formData.append("target_skills", JSON.stringify(targetSkills));
+      formData.append("passing_score", data.passing_score ?? "");
+      const { framework, level_order } = parseProgressionLevelOption(
+        data.progression_level,
+      );
+      formData.append("framework", framework);
+      formData.append("level_order", level_order);
       if (data.thumbnail?.[0]) {
         formData.append("thumbnail", data.thumbnail[0]);
       }
@@ -130,6 +141,11 @@ function LessonsPage() {
       lesson_type: lesson.lesson_type,
       difficulty_level: lesson.difficulty_level,
       estimated_duration: lesson.estimated_duration,
+      passing_score: lesson.passing_score ?? "",
+      progression_level: toProgressionLevelOption(
+        lesson.framework,
+        lesson.level_order,
+      ),
     });
     setEditLessonOutcomes(parseJsonArray(lesson.lesson_outcomes));
     setEditTargetSkills(parseJsonArray(lesson.target_skills));
@@ -167,6 +183,12 @@ function LessonsPage() {
       formData.append("estimated_duration", data.estimated_duration);
       formData.append("lesson_outcomes", JSON.stringify(editLessonOutcomes));
       formData.append("target_skills", JSON.stringify(editTargetSkills));
+      formData.append("passing_score", data.passing_score ?? "");
+      const { framework, level_order } = parseProgressionLevelOption(
+        data.progression_level,
+      );
+      formData.append("framework", framework);
+      formData.append("level_order", level_order);
       if (data.thumbnail?.[0]) {
         formData.append("thumbnail", data.thumbnail[0]);
       }
@@ -496,6 +518,32 @@ function LessonsPage() {
             />
           </div>
           <div className="mb-4">
+            <FormInput
+              label="Passing Score (%)"
+              type="number"
+              register={register}
+              name="passing_score"
+              errors={errors}
+              placeholder="Leave blank to use the batch's default threshold"
+              validation={{
+                min: { value: 0, message: "Must be at least 0" },
+                max: { value: 100, message: "Must be at most 100" },
+              }}
+            />
+          </div>
+          <div className="mb-4">
+            <FormSelect
+              label="Progression Level"
+              register={register}
+              name="progression_level"
+              errors={errors}
+              options={PROGRESSION_LEVEL_OPTIONS}
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Not part of a tracked progression"
+            />
+          </div>
+          <div className="mb-4">
             <MultiCheckboxSelector
               label="Lesson Outcomes"
               options={LESSON_OUTCOMES}
@@ -611,6 +659,32 @@ function LessonsPage() {
               register={editRegister}
               name="estimated_duration"
               errors={editErrors}
+            />
+          </div>
+          <div className="mb-4">
+            <FormInput
+              label="Passing Score (%)"
+              type="number"
+              register={editRegister}
+              name="passing_score"
+              errors={editErrors}
+              placeholder="Leave blank to use the batch's default threshold"
+              validation={{
+                min: { value: 0, message: "Must be at least 0" },
+                max: { value: 100, message: "Must be at most 100" },
+              }}
+            />
+          </div>
+          <div className="mb-4">
+            <FormSelect
+              label="Progression Level"
+              register={editRegister}
+              name="progression_level"
+              errors={editErrors}
+              options={PROGRESSION_LEVEL_OPTIONS}
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Not part of a tracked progression"
             />
           </div>
           <div className="mb-4">

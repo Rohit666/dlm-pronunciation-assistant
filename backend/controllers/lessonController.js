@@ -1,5 +1,17 @@
 const { Lesson } = require("../models");
 const { parseJsonField } = require("../utils/jsonHelper");
+
+// FormData/JSON both send these as strings (or omit them entirely);
+// "" and undefined both mean "mentor left it unset", which for a
+// nullable/defaulted column must reach Sequelize as null/undefined,
+// never as NaN or the empty string.
+const toNullableDecimal = (value) =>
+  value === undefined || value === null || value === "" ? null : value;
+
+const toNullableInt = (value) =>
+  value === undefined || value === null || value === ""
+    ? null
+    : parseInt(value, 10);
 exports.getLessons = async (req, res) => {
   try {
     const { status } = req.query;
@@ -70,6 +82,9 @@ exports.createLesson = async (req, res) => {
       estimated_duration,
       lesson_outcomes,
       target_skills,
+      passing_score,
+      framework,
+      level_order,
     } = req.body;
 
     const lesson = await Lesson.create({
@@ -84,6 +99,14 @@ exports.createLesson = async (req, res) => {
       estimated_duration,
       lesson_outcomes: lesson_outcomes ? JSON.parse(lesson_outcomes) : [],
       target_skills: target_skills ? JSON.parse(target_skills) : [],
+      // Mentor-configured unlock threshold; null falls back to the
+      // batch default, then 70.00 (see progressionService.js).
+      passing_score: toNullableDecimal(passing_score),
+      // Which milestone track this lesson advances (defaults to 'cefr'
+      // in the model when omitted); level_order is its 1-indexed
+      // position on that track, or null if untracked.
+      framework: framework || undefined,
+      level_order: toNullableInt(level_order),
     });
 
     res.status(201).json({
@@ -113,6 +136,9 @@ exports.updateLesson = async (req, res) => {
       estimated_duration,
       lesson_outcomes,
       target_skills,
+      passing_score,
+      framework,
+      level_order,
     } = req.body;
 
     const lesson = await Lesson.findByPk(id);
@@ -140,6 +166,9 @@ exports.updateLesson = async (req, res) => {
       estimated_duration,
       lesson_outcomes: lesson_outcomes ? JSON.parse(lesson_outcomes) : [],
       target_skills: target_skills ? JSON.parse(target_skills) : [],
+      passing_score: toNullableDecimal(passing_score),
+      framework: framework || lesson.framework,
+      level_order: toNullableInt(level_order),
     });
 
     res.json({
