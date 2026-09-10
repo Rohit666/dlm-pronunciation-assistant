@@ -1,4 +1,12 @@
-const { Lesson, Topic, LessonSentence, LessonExercise } = require("../models");
+const {
+  Lesson,
+  Topic,
+  LessonSentence,
+  LessonExercise,
+  PracticeSession,
+  Assessment,
+  ExerciseAttempt,
+} = require("../models");
 
 // ---------------------------------------------------------------------
 // Linearized Course Play Stream.
@@ -116,4 +124,78 @@ function locateInStream(stream, itemType, itemId) {
   };
 }
 
-module.exports = { getCoursePlayStream, locateInStream };
+// ---------------------------------------------------------------------
+// Resume resolution.
+//
+// Bug fix: "Resume Practice" must land on the FIRST incomplete stream
+// item, not whatever the mentee happened to touch most recently.
+// mentee_course_progress.last_active_item only ever records "last
+// opened" — it was being read directly as the resume target, so opening
+// the Assessment (even without finishing it) overwrote the pointer and
+// Resume Practice kept sending the mentee back to it, skipping a still-
+// incomplete earlier sentence entirely.
+//
+// Completion rules:
+//   content (sentence)    -> mentee has an accepted assessment
+//                            (assessments.is_accepted = TRUE, joined
+//                            through its practice_session) for that
+//                            lesson_sentence
+//   assessment (exercise) -> mentee has at least one exercise_attempts
+//                            row with passed = TRUE for that exercise
+//
+// Returns null for a missing/empty course. Otherwise
+// { status: 'incomplete', item } for the first incomplete stream entry,
+// or { status: 'complete', item } once every item is done — item is
+// then the LAST assessment in the stream (its result screen) when the
+// course has one, else the first stream item (nothing left to resume
+// into but the start, for review).
+// ---------------------------------------------------------------------
+async function getResumeItem(courseId, menteeId) {
+  const stream = await getCoursePlayStream(courseId);
+  if (!stream || !stream.length) return null;
+
+  const contentIds = stream.filter((entry) => entry.item_type === "content").map((entry) => entry.id);
+  const assessmentIds = stream
+    .filter((entry) => entry.item_type === "assessment")
+    .map((entry) => entry.id);
+
+  const [acceptedAssessments, passedAttempts] = await Promise.all([
+    contentIds.length
+      ? Assessment.findAll({
+          where: { is_accepted: true },
+          include: [
+            {
+              model: PracticeSession,
+              required: true,
+              where: { mentee_id: menteeId, lesson_sentence_id: contentIds },
+            },
+          ],
+        })
+      : [],
+    assessmentIds.length
+      ? ExerciseAttempt.findAll({
+          where: { mentee_id: menteeId, exercise_id: assessmentIds, passed: true },
+        })
+      : [],
+  ]);
+
+  const completedContentIds = new Set(
+    acceptedAssessments.map((assessment) => assessment.PracticeSession.lesson_sentence_id),
+  );
+  const completedAssessmentIds = new Set(passedAttempts.map((attempt) => attempt.exercise_id));
+
+  const isComplete = (entry) =>
+    entry.item_type === "content"
+      ? completedContentIds.has(entry.id)
+      : completedAssessmentIds.has(entry.id);
+
+  const firstIncomplete = stream.find((entry) => !isComplete(entry));
+  if (firstIncomplete) {
+    return { status: "incomplete", item: firstIncomplete };
+  }
+
+  const lastAssessment = [...stream].reverse().find((entry) => entry.item_type === "assessment");
+  return { status: "complete", item: lastAssessment || stream[0] };
+}
+
+module.exports = { getCoursePlayStream, locateInStream, getResumeItem };

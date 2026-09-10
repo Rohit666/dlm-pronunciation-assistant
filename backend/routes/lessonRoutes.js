@@ -48,6 +48,14 @@ router.post(
   allowRoles("mentee"),
   courseStreamController.updateProgress,
 );
+// Resolved resume target — first incomplete stream item, not the raw
+// last-touched pointer /progress above returns.
+router.get(
+  "/:lessonId/resume",
+  verifyToken,
+  allowRoles("mentee"),
+  courseStreamController.getResumeTarget,
+);
 
 router.put(
   "/:id",

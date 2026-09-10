@@ -1,5 +1,9 @@
 const { Mentee, MenteeCourseProgress } = require("../models");
-const { getCoursePlayStream, locateInStream } = require("../services/courseStreamService");
+const {
+  getCoursePlayStream,
+  locateInStream,
+  getResumeItem,
+} = require("../services/courseStreamService");
 
 async function resolveMentee(userId) {
   return Mentee.findOne({ where: { user_id: userId } });
@@ -66,6 +70,30 @@ exports.getProgress = async (req, res) => {
       // content/assessment) — caller falls back to "start from the top".
       position,
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/lessons/:lessonId/resume — the resolved "Resume Practice"
+// target: the FIRST incomplete item in the play stream (never the raw
+// last_active_item pointer — see getResumeItem for why that was wrong).
+exports.getResumeTarget = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+
+    const mentee = await resolveMentee(req.user.id);
+    if (!mentee) {
+      return res.status(404).json({ success: false, message: "Mentee not found" });
+    }
+
+    const resume = await getResumeItem(lessonId, mentee.id);
+    if (!resume) {
+      return res.status(404).json({ success: false, message: "Course not found" });
+    }
+
+    res.json({ success: true, status: resume.status, item: resume.item });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: "Server error" });
