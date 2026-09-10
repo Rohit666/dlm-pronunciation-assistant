@@ -32,6 +32,7 @@ import {
 import { API_BASE_URL } from "../../constants/api";
 import ExerciseBuilderDrawer from "../../features/exercises/mentor/ExerciseBuilderDrawer";
 import ExerciseCard from "../../features/exercises/mentor/ExerciseCard";
+import ExerciseSubmissionsDrawer from "../../features/exercises/mentor/ExerciseSubmissionsDrawer";
 import {
   getLessonExercises,
   deleteLessonExercise,
@@ -67,6 +68,9 @@ function LessonDetailPage() {
   const [exerciseDrawerTopicId, setExerciseDrawerTopicId] = useState(null);
   const [exerciseDeleteModal, setExerciseDeleteModal] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState(null);
+  // Comprehensive Assessment History Hubs (mentor half) — the exercise
+  // whose "Submissions" drawer is open, or null when closed.
+  const [submissionsExercise, setSubmissionsExercise] = useState(null);
 
   // Single shared drawer (Create + Edit) — see SentenceBlockBuilder for
   // the block editor itself. drawerMode picks which endpoint submit
@@ -104,7 +108,6 @@ function LessonDetailPage() {
       setExercisesLoading(true);
       const data = await getLessonExercises(lessonId);
       setExercises(data);
-      console.log("Fetched exercises:", data);
     } catch (error) {
       console.error(error);
       toast.error("Failed to load exercises");
@@ -367,10 +370,7 @@ function LessonDetailPage() {
             </div>
           </div>
 
-          <DndContext
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
+          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             {!loading && sentences.length === 0 && (
               <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
                 <h3 className="text-2xl font-bold text-gray-700 mb-3">
@@ -435,6 +435,7 @@ function LessonDetailPage() {
                   setSelectedExercise(ex);
                   setExerciseDeleteModal(true);
                 }}
+                onViewSubmissions={setSubmissionsExercise}
               />
             ))}
           </div>
@@ -529,6 +530,12 @@ function LessonDetailPage() {
         message="Are you sure you want to delete this assessment? All questions and student attempt history for it will be permanently removed."
         onConfirm={handleDeleteExercise}
         onCancel={() => setExerciseDeleteModal(false)}
+      />
+
+      <ExerciseSubmissionsDrawer
+        exercise={submissionsExercise}
+        open={!!submissionsExercise}
+        onClose={() => setSubmissionsExercise(null)}
       />
     </DashboardLayout>
   );

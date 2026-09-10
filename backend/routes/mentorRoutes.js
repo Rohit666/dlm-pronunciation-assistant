@@ -38,6 +38,23 @@ router.delete(
   exerciseController.deleteExercise,
 );
 
+// Comprehensive Assessment History Hubs (mentor half) — cohort
+// submission review. Scoped to the mentor's own batches (admin sees
+// everything) — see resolveMentorVisibleMenteeIds in
+// exerciseController.js.
+router.get(
+  "/exercises/:exerciseId/attempts",
+  verifyToken,
+  allowRoles("mentor", "admin"),
+  exerciseController.getExerciseAttemptsForMentor,
+);
+router.get(
+  "/assessment-attempts/:attemptId",
+  verifyToken,
+  allowRoles("mentor", "admin"),
+  exerciseController.getAttemptDetailForMentor,
+);
+
 // Hierarchical Content Tree — mentor authority to shape a course's topic
 // tree. Read side (GET tree) lives on lessonRoutes.js since mentees read
 // it too.

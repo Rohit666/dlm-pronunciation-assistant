@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import {
-  CheckCircle2,
-  XCircle,
-  ArrowLeft,
-  ArrowRight,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import DashboardLayout from "../../layouts/DashboardLayout";
 import Loader from "../../components/Loader";
@@ -21,6 +14,7 @@ import {
   updateCourseProgress,
 } from "../../services/courseStreamService";
 import QUESTION_TYPES from "../../constants/exerciseQuestionTypes";
+import ReportCard from "./ReportCard";
 
 // ---------------------------------------------------------------------
 // Full-width assessment player. Replaces ExercisePlayerModal (deprecated
@@ -216,199 +210,6 @@ function isAnswered(question, answer) {
   return answer !== undefined && answer !== null && answer !== "";
 }
 
-// Defensive normalizer — same rationale as ExerciseCard.jsx's
-// parseJsonMaybe: the real fix for JSON columns arriving as unparsed
-// strings is the Sequelize getters on ExerciseQuestion/
-// ExerciseAttemptAnswer (MariaDB's JSON type is LONGTEXT under the
-// hood, so mysql2 never auto-parses it there). This is belt-and-
-// suspenders on top of that for contentPayload/gradingRubric/
-// studentAnswer, wherever they enter this file.
-function safeParse(value, fallback) {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value !== "string") return value;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
-}
-
-// Bug 1 + Bug 3 fix, shared by both the top-level answer sheet and
-// comprehension's per-sub-question breakdown (same {questionType,
-// contentPayload, studentAnswer} shape either way) — resolves a raw
-// stored answer (an option id, a token-id array) into what a mentee
-// would recognize as their own answer.
-function formatAnswerValue(questionType, contentPayload, rawValue) {
-  const payload = safeParse(contentPayload, {}) || {};
-  const value = safeParse(rawValue, rawValue);
-
-  if (value === null || value === undefined || value === "") return "(no answer)";
-
-  if (questionType === QUESTION_TYPES.MCQ || questionType === QUESTION_TYPES.TRUE_FALSE) {
-    const option = (payload.options || []).find((o) => String(o.id) === String(value));
-    return option ? option.label : String(value);
-  }
-
-  if (questionType === QUESTION_TYPES.SENTENCE_FORMATION) {
-    const tokenIds = Array.isArray(value) ? value : safeParse(value, []) || [];
-    const tokenMap = new Map((payload.tokens || []).map((t) => [String(t.id), t.text]));
-    const words = tokenIds.map((id) => tokenMap.get(String(id)) || "?");
-    return words.length ? words.join(" ") : "(no answer)";
-  }
-
-  if (questionType === QUESTION_TYPES.FILL_BLANK) {
-    // Multi-blank answers are stored comma-joined ("is,Now") — render
-    // as clean, spaced-out text rather than the raw joined string.
-    return typeof value === "string" ? value.split(",").map((v) => v.trim()).join(", ") : String(value);
-  }
-
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-// Bug 4 fix (frontend half) — the answer key each sub-question's grade
-// is measured against, same resolution rules as formatAnswerValue.
-function formatExpectedAnswer(questionType, contentPayload, gradingRubric) {
-  const payload = safeParse(contentPayload, {}) || {};
-  const rubric = safeParse(gradingRubric, {}) || {};
-
-  if (questionType === QUESTION_TYPES.MCQ || questionType === QUESTION_TYPES.TRUE_FALSE) {
-    const option = (payload.options || []).find(
-      (o) => String(o.id) === String(rubric.correct_option_id),
-    );
-    return option ? option.label : rubric.correct_option_id || "—";
-  }
-
-  if (questionType === QUESTION_TYPES.FILL_BLANK) {
-    return (rubric.acceptable_answers || []).join(" / ") || "—";
-  }
-
-  if (questionType === QUESTION_TYPES.SENTENCE_FORMATION) {
-    const tokenMap = new Map((payload.tokens || []).map((t) => [String(t.id), t.text]));
-    const expected = rubric.expected_order || [];
-    return expected.map((id) => tokenMap.get(String(id)) || "?").join(" ") || "—";
-  }
-
-  return rubric.explanation || "—";
-}
-
-function answerSheetDisplay(entry) {
-  return formatAnswerValue(entry.questionType, entry.contentPayload, entry.studentAnswer);
-}
-
-// Bug 4 fix (frontend half) — this used to show only feedback text +
-// score, never the sub-question's own prompt, the mentee's resolved
-// answer, or the expected answer key, so a comprehension entry read as
-// blank even though it was fully graded server-side (subResults already
-// carried all of this — see gradeComprehension in
-// exerciseEvaluationService.js). Same {questionType, contentPayload,
-// gradingRubric, studentAnswer} shape as a top-level answer-sheet entry,
-// so it reuses the exact same formatting helpers.
-function ComprehensionAnswerSheet({ entry }) {
-  return (
-    <div className="space-y-2 mt-3">
-      {(entry.subResults || []).map((sub, index) => (
-        <div
-          key={sub.id}
-          className={`rounded-lg p-3 border text-sm ${
-            sub.isCorrect ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
-          }`}
-        >
-          <div className="flex items-start gap-2">
-            {sub.isCorrect ? (
-              <CheckCircle2 size={16} className="text-green-600 shrink-0 mt-0.5" />
-            ) : (
-              <XCircle size={16} className="text-red-600 shrink-0 mt-0.5" />
-            )}
-            <div className="flex-1 min-w-0 space-y-1">
-              <p className="font-medium text-gray-700">Sub-question {index + 1}</p>
-              <div
-                className="text-gray-700"
-                dangerouslySetInnerHTML={{ __html: sub.prompt || "" }}
-              />
-              <p className="text-gray-600">
-                <span className="font-medium">Your answer: </span>
-                {formatAnswerValue(sub.questionType, sub.contentPayload, sub.studentAnswer)}
-              </p>
-              {!sub.isCorrect && (
-                <p className="text-gray-600">
-                  <span className="font-medium">Expected: </span>
-                  {formatExpectedAnswer(sub.questionType, sub.contentPayload, sub.gradingRubric)}
-                </p>
-              )}
-              {sub.feedback && <p className="text-gray-500 mt-1">{sub.feedback}</p>}
-              <p className="text-xs text-gray-400 mt-1">
-                {sub.scoreAwarded} / {sub.points} point{sub.points === 1 ? "" : "s"}
-              </p>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function AnswerSheetRow({ entry, index }) {
-  const [expanded, setExpanded] = useState(false);
-  const isComprehension = entry.questionType === QUESTION_TYPES.COMPREHENSION;
-
-  return (
-    <div
-      className={`rounded-xl border ${
-        entry.isCorrect ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-start gap-3 p-4 text-left cursor-pointer"
-      >
-        {entry.isCorrect ? (
-          <CheckCircle2 size={20} className="text-green-600 shrink-0 mt-0.5" />
-        ) : (
-          <XCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
-        )}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-500 mb-1">Question {index + 1}</p>
-          {isComprehension ? (
-            (() => {
-              const payload = safeParse(entry.contentPayload, {}) || {};
-              return payload.passage_html ? (
-                <div className="border-l-4 border-indigo-300 bg-indigo-50/60 rounded-r-lg p-3 mb-2">
-                  <p className="text-xs font-semibold text-indigo-400 mb-1 uppercase tracking-wide">
-                    Reading Passage
-                  </p>
-                  <div
-                    className="text-sm text-gray-700 prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: payload.passage_html }}
-                  />
-                </div>
-              ) : null;
-            })()
-          ) : (
-            <div className="text-gray-800 mb-2" dangerouslySetInnerHTML={{ __html: entry.prompt }} />
-          )}
-          {!isComprehension && (
-            <p className="text-sm text-gray-700">
-              <span className="font-medium">Your answer: </span>
-              {answerSheetDisplay(entry)}
-            </p>
-          )}
-          {entry.feedback && <p className="text-sm text-gray-500 mt-1">{entry.feedback}</p>}
-          <p className="text-xs text-gray-400 mt-1">
-            {entry.scoreAwarded} / {entry.points} point{entry.points === 1 ? "" : "s"} awarded
-          </p>
-        </div>
-        {expanded ? <ChevronUp size={18} className="shrink-0" /> : <ChevronDown size={18} className="shrink-0" />}
-      </button>
-      {expanded && isComprehension && (
-        <div className="px-4 pb-4">
-          <ComprehensionAnswerSheet entry={entry} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 function AssessmentPlayerPage() {
   const { lessonId, exerciseId } = useParams();
   const navigate = useNavigate();
@@ -549,53 +350,25 @@ function AssessmentPlayerPage() {
 
           {result ? (
             <div className="mt-8">
-              <div
-                className={`rounded-2xl p-6 text-center mb-6 ${
-                  result.attempt.passed
-                    ? "bg-green-50 border border-green-200"
-                    : "bg-amber-50 border border-amber-200"
-                }`}
-              >
-                <p
-                  className={`text-4xl font-bold ${
-                    result.attempt.passed ? "text-green-700" : "text-amber-700"
-                  }`}
-                >
-                  {result.attempt.percentage}%
-                </p>
-                <p
-                  className={`mt-2 font-semibold ${
-                    result.attempt.passed ? "text-green-700" : "text-amber-700"
-                  }`}
-                >
-                  {result.attempt.passed ? "Passed" : "Not Passed Yet"}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {result.attempt.totalScore} / {result.attempt.maxScore} points · Attempt #
-                  {result.attempt.attemptNumber} · Passing score {result.attempt.passingPercentage}%
-                </p>
-              </div>
-
-              <h3 className="font-semibold text-gray-700 mb-4">Diagnostic Report Card</h3>
-              <div className="space-y-3 mb-8">
-                {result.answerSheet.map((entry, index) => (
-                  <AnswerSheetRow key={entry.questionId} entry={entry} index={index} />
-                ))}
-              </div>
-
-              <div className="flex flex-wrap justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={handleRetake}
-                  className="px-6 py-3 border rounded-2xl hover:bg-gray-100 transition-all duration-300 cursor-pointer"
-                >
-                  Retake Exercise
-                </button>
-                <PrimaryButton onClick={goToNextStreamItem}>
-                  {nextStreamItem ? "Continue" : "Back to Lesson"}
-                  <ArrowRight size={16} className="inline ml-2" />
-                </PrimaryButton>
-              </div>
+              <ReportCard
+                attempt={result.attempt}
+                answerSheet={result.answerSheet}
+                actions={
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleRetake}
+                      className="px-6 py-3 border rounded-2xl hover:bg-gray-100 transition-all duration-300 cursor-pointer"
+                    >
+                      Retake Exercise
+                    </button>
+                    <PrimaryButton onClick={goToNextStreamItem}>
+                      {nextStreamItem ? "Continue" : "Back to Lesson"}
+                      <ArrowRight size={16} className="inline ml-2" />
+                    </PrimaryButton>
+                  </>
+                }
+              />
             </div>
           ) : (
             <div className="mt-8">

@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 
 const menteeDashboardController = require("../controllers/menteeDashboardController");
+const exerciseController = require("../controllers/exerciseController");
 
 const { verifyToken } = require("../middleware/authMiddleware");
 
@@ -36,6 +37,18 @@ router.get(
   verifyToken,
   allowRoles("mentee"),
   menteeDashboardController.getAttemptTrajectory,
+);
+
+// Comprehensive Assessment History Hub (mentee half) — every assessment
+// attempt this mentee has submitted, across every lesson. Lives on
+// exerciseController.js (kept alongside the rest of the exercise-attempt
+// logic) but mounted here, since this router is already the mentee's
+// cross-lesson data hub.
+router.get(
+  "/assessment-attempts",
+  verifyToken,
+  allowRoles("mentee"),
+  exerciseController.getMenteeAssessmentAttempts,
 );
 
 module.exports = router;

@@ -5,6 +5,8 @@ const {
   ExerciseQuestion,
   ExerciseAttempt,
   Mentee,
+  Batch,
+  User,
 } = require("../models");
 const exerciseEvaluationService = require("../services/exerciseEvaluationService");
 const { sanitizeBlockText } = require("../utils/sentenceBlocks");
@@ -46,18 +48,11 @@ function sanitizeQuestionContentPayload(questionType, contentPayload) {
 // whatever the client happened to send — Bug 3 fix, so a direct API
 // call can't desync the stored `points` column from what grading
 // actually awards.
-function computeQuestionPoints(
-  questionType,
-  sanitizedContentPayload,
-  clientPoints,
-) {
+function computeQuestionPoints(questionType, sanitizedContentPayload, clientPoints) {
   if (questionType === QUESTION_TYPES.COMPREHENSION) {
     const subQuestions = sanitizedContentPayload?.sub_questions || [];
     if (subQuestions.length) {
-      return subQuestions.reduce(
-        (sum, sub) => sum + (Number(sub.points) || 1),
-        0,
-      );
+      return subQuestions.reduce((sum, sub) => sum + (Number(sub.points) || 1), 0);
     }
   }
   return clientPoints ?? 1;
@@ -68,34 +63,6 @@ function computeQuestionPoints(
 // admin get it back (needed to review/edit exercises), gated only by
 // verifyToken here since lesson-management routes already gate creation
 // by role; reading a lesson's own exercises is not sensitive by role.
-const parseQuestionFields = (q) => {
-  const item = q.toJSON ? q.toJSON() : q;
-  let contentPayload = item.content_payload;
-  let gradingRubric = item.grading_rubric;
-
-  if (typeof contentPayload === "string") {
-    try {
-      contentPayload = JSON.parse(contentPayload || "{}");
-    } catch {
-      contentPayload = {};
-    }
-  }
-
-  if (typeof gradingRubric === "string") {
-    try {
-      gradingRubric = JSON.parse(gradingRubric || "{}");
-    } catch {
-      gradingRubric = null;
-    }
-  }
-
-  return {
-    ...item,
-    content_payload: contentPayload,
-    grading_rubric: gradingRubric,
-  };
-};
-
 exports.getLessonExercises = async (req, res) => {
   try {
     const { lessonId } = req.params;
@@ -119,12 +86,11 @@ exports.getLessonExercises = async (req, res) => {
       const exerciseJson = exercise.toJSON();
       return {
         ...exerciseJson,
-        questions: (exerciseJson.questions || []).map((rawQuestion) => {
-          const parsedQuestion = parseQuestionFields(rawQuestion);
-          return stripRubric
-            ? { ...parsedQuestion, grading_rubric: undefined }
-            : parsedQuestion;
-        }),
+        questions: exerciseJson.questions.map((question) =>
+          stripRubric
+            ? { ...question, grading_rubric: undefined }
+            : question,
+        ),
       };
     });
 
@@ -143,16 +109,12 @@ exports.submitExercise = async (req, res) => {
     const { answers } = req.body;
 
     if (!Array.isArray(answers)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "answers must be an array" });
+      return res.status(400).json({ success: false, message: "answers must be an array" });
     }
 
     const mentee = await resolveMentee(req.user.id);
     if (!mentee) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Mentee not found" });
+      return res.status(404).json({ success: false, message: "Mentee not found" });
     }
 
     const result = await exerciseEvaluationService.submitExerciseAttempt({
@@ -180,9 +142,7 @@ exports.getExerciseAttempts = async (req, res) => {
 
     const mentee = await resolveMentee(req.user.id);
     if (!mentee) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Mentee not found" });
+      return res.status(404).json({ success: false, message: "Mentee not found" });
     }
 
     const attempts = await ExerciseAttempt.findAll({
@@ -191,6 +151,197 @@ exports.getExerciseAttempts = async (req, res) => {
     });
 
     res.json({ success: true, attempts });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/mentee-dashboard/assessment-attempts — Comprehensive Assessment
+// History Hub (mentee half): every assessment attempt this mentee has
+// ever submitted, across every lesson, newest first. Mounted under
+// mentee-dashboard (the mentee's existing cross-lesson data hub) rather
+// than a new /api/mentee route file, since that router already exists
+// for exactly this kind of "mentee's own data across lessons" query.
+exports.getMenteeAssessmentAttempts = async (req, res) => {
+  try {
+    const mentee = await resolveMentee(req.user.id);
+    if (!mentee) {
+      return res.status(404).json({ success: false, message: "Mentee not found" });
+    }
+
+    const attempts = await ExerciseAttempt.findAll({
+      where: { mentee_id: mentee.id },
+      include: [
+        {
+          model: LessonExercise,
+          attributes: ["id", "title", "lesson_id"],
+          include: [{ model: Lesson, attributes: ["id", "title"] }],
+        },
+      ],
+      order: [["submitted_at", "DESC"]],
+    });
+
+    res.json({ success: true, attempts });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/exercises/attempts/:attemptId — the full Diagnostic Report
+// Card for one of THIS mentee's own past attempts (ownership-checked —
+// a mentee can never fetch another mentee's attempt by guessing an id).
+// Two path segments, so it never collides with GET /:exerciseId above.
+exports.getMenteeAttemptDetail = async (req, res) => {
+  try {
+    const { attemptId } = req.params;
+
+    const mentee = await resolveMentee(req.user.id);
+    if (!mentee) {
+      return res.status(404).json({ success: false, message: "Mentee not found" });
+    }
+
+    const attempt = await ExerciseAttempt.findOne({
+      where: { id: attemptId, mentee_id: mentee.id },
+      include: [
+        {
+          model: LessonExercise,
+          attributes: ["id", "title", "passing_percentage", "lesson_id"],
+          include: [{ model: Lesson, attributes: ["id", "title"] }],
+        },
+      ],
+    });
+
+    if (!attempt) {
+      return res.status(404).json({ success: false, message: "Attempt not found" });
+    }
+
+    const answerSheet = await exerciseEvaluationService.buildAttemptAnswerSheet(
+      attempt.id,
+      attempt.exercise_id,
+    );
+
+    res.json({
+      success: true,
+      exercise: attempt.LessonExercise,
+      attempt: exerciseEvaluationService.formatAttemptSummary(
+        attempt,
+        attempt.LessonExercise?.passing_percentage,
+      ),
+      answerSheet,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Shared by both mentor attempt endpoints below — mirrors
+// mentorReviewController.getReviewAttempts' exact scoping convention
+// (mentor -> their batches -> mentees in those batches), the
+// established pattern for "which mentees can this mentor see" in this
+// codebase. Admin bypasses batch scoping entirely (oversight access,
+// same convention as exerciseController's other mentor/admin routes).
+async function resolveMentorVisibleMenteeIds(req) {
+  if (req.user.role === "admin") return null; // null = no restriction
+  const mentorBatches = await Batch.findAll({ where: { mentor_id: req.user.id } });
+  const batchIds = mentorBatches.map((batch) => batch.id);
+  const mentees = await Mentee.findAll({ where: { batch_id: batchIds } });
+  return mentees.map((mentee) => mentee.id);
+}
+
+// GET /api/mentor/exercises/:exerciseId/attempts — every attempt on this
+// exercise submitted by a mentee in one of the mentor's own batches
+// (admin sees every attempt on the exercise, unscoped).
+exports.getExerciseAttemptsForMentor = async (req, res) => {
+  try {
+    const { exerciseId } = req.params;
+
+    const exercise = await LessonExercise.findByPk(exerciseId);
+    if (!exercise) {
+      return res.status(404).json({ success: false, message: "Exercise not found" });
+    }
+
+    const visibleMenteeIds = await resolveMentorVisibleMenteeIds(req);
+    const where = { exercise_id: exerciseId };
+    if (visibleMenteeIds !== null) {
+      where.mentee_id = visibleMenteeIds;
+    }
+
+    const attempts = await ExerciseAttempt.findAll({
+      where,
+      include: [
+        {
+          model: Mentee,
+          attributes: ["id", "batch_id"],
+          include: [
+            { model: User, attributes: ["id", "name", "email"] },
+            { model: Batch, attributes: ["id", "batch_name"] },
+          ],
+        },
+      ],
+      order: [["submitted_at", "DESC"]],
+    });
+
+    res.json({ success: true, exercise, attempts });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/mentor/assessment-attempts/:attemptId — full answer sheet for
+// one mentee's specific submission, so a mentor can audit exact answers,
+// sub-question results, and awarded scores. Same batch-scoping as above
+// — a mentor can't inspect an attempt from a mentee outside their
+// batches by guessing an attempt id.
+exports.getAttemptDetailForMentor = async (req, res) => {
+  try {
+    const { attemptId } = req.params;
+
+    const attempt = await ExerciseAttempt.findByPk(attemptId, {
+      include: [
+        {
+          model: Mentee,
+          attributes: ["id", "batch_id"],
+          include: [
+            { model: User, attributes: ["id", "name", "email"] },
+            { model: Batch, attributes: ["id", "batch_name"] },
+          ],
+        },
+        {
+          model: LessonExercise,
+          attributes: ["id", "title", "passing_percentage", "lesson_id"],
+          include: [{ model: Lesson, attributes: ["id", "title"] }],
+        },
+      ],
+    });
+
+    if (!attempt) {
+      return res.status(404).json({ success: false, message: "Attempt not found" });
+    }
+
+    const visibleMenteeIds = await resolveMentorVisibleMenteeIds(req);
+    if (visibleMenteeIds !== null && !visibleMenteeIds.includes(attempt.mentee_id)) {
+      return res.status(404).json({ success: false, message: "Attempt not found" });
+    }
+
+    const answerSheet = await exerciseEvaluationService.buildAttemptAnswerSheet(
+      attempt.id,
+      attempt.exercise_id,
+    );
+
+    res.json({
+      success: true,
+      mentee: attempt.Mentee,
+      exercise: attempt.LessonExercise,
+      attempt: exerciseEvaluationService.formatAttemptSummary(
+        attempt,
+        attempt.LessonExercise?.passing_percentage,
+      ),
+      answerSheet,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -217,15 +368,11 @@ exports.createExercise = async (req, res) => {
 
     const lesson = await Lesson.findByPk(lessonId);
     if (!lesson) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Lesson not found" });
+      return res.status(404).json({ success: false, message: "Lesson not found" });
     }
 
     if (!title) {
-      return res
-        .status(400)
-        .json({ success: false, message: "title is required" });
+      return res.status(400).json({ success: false, message: "title is required" });
     }
 
     const result = await sequelize.transaction(async (transaction) => {
@@ -300,9 +447,7 @@ exports.getExerciseById = async (req, res) => {
     });
 
     if (!exercise) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Exercise not found" });
+      return res.status(404).json({ success: false, message: "Exercise not found" });
     }
 
     const stripRubric = req.user?.role === "mentee";
@@ -312,12 +457,9 @@ exports.getExerciseById = async (req, res) => {
       success: true,
       exercise: {
         ...exerciseJson,
-        questions: exerciseJson.questions.map((rawQuestion) => {
-          const parsedQuestion = parseQuestionFields(rawQuestion);
-          return stripRubric
-            ? { ...parsedQuestion, grading_rubric: undefined }
-            : parsedQuestion;
-        }),
+        questions: exerciseJson.questions.map((question) =>
+          stripRubric ? { ...question, grading_rubric: undefined } : question,
+        ),
       },
     });
   } catch (error) {
@@ -336,9 +478,7 @@ exports.deleteExercise = async (req, res) => {
 
     const exercise = await LessonExercise.findByPk(exerciseId);
     if (!exercise) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Exercise not found" });
+      return res.status(404).json({ success: false, message: "Exercise not found" });
     }
 
     await exercise.destroy();

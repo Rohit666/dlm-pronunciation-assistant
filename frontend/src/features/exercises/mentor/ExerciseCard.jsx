@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Trash2, ClipboardList, CheckCircle2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, ClipboardList, CheckCircle2, Users } from "lucide-react";
 
 const QUESTION_TYPE_LABELS = {
   mcq: "Multiple Choice",
@@ -123,7 +123,7 @@ function AnswerKey({ question }) {
 // shows each question's full prompt + answer key — rather than
 // launching the mentee-facing AssessmentPlayerPage, which submits real
 // attempts and has no read-only mode.
-function ExerciseCard({ exercise, onDelete }) {
+function ExerciseCard({ exercise, onDelete, onViewSubmissions }) {
   const [expanded, setExpanded] = useState(false);
   const questions = exercise.questions || [];
 
@@ -144,6 +144,16 @@ function ExerciseCard({ exercise, onDelete }) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {onViewSubmissions && (
+            <button
+              type="button"
+              onClick={() => onViewSubmissions(exercise)}
+              className="flex items-center gap-1 border px-4 py-2 rounded-xl hover:bg-gray-100 transition-all duration-300 cursor-pointer text-sm"
+            >
+              <Users size={16} />
+              Submissions
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
