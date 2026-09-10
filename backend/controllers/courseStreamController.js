@@ -93,7 +93,15 @@ exports.getResumeTarget = async (req, res) => {
       return res.status(404).json({ success: false, message: "Course not found" });
     }
 
-    res.json({ success: true, status: resume.status, item: resume.item });
+    res.json({
+      success: true,
+      status: resume.status,
+      item: resume.item,
+      // Present only for status === "attempt_in_progress" — see
+      // getResumeItem for why an open practice_attempts row overrides
+      // the stream-based completion read.
+      activeAttempt: resume.activeAttempt || null,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: "Server error" });

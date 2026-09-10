@@ -6,7 +6,9 @@ const {
   PracticeSession,
   Assessment,
   ExerciseAttempt,
+  PracticeAttempt,
 } = require("../models");
+const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses");
 
 // ---------------------------------------------------------------------
 // Linearized Course Play Stream.
@@ -127,15 +129,35 @@ function locateInStream(stream, itemType, itemId) {
 // ---------------------------------------------------------------------
 // Resume resolution.
 //
-// Bug fix: "Resume Practice" must land on the FIRST incomplete stream
-// item, not whatever the mentee happened to touch most recently.
+// Bug fix #1: "Resume Practice" must land on the FIRST incomplete
+// stream item, not whatever the mentee happened to touch most recently.
 // mentee_course_progress.last_active_item only ever records "last
 // opened" — it was being read directly as the resume target, so opening
 // the Assessment (even without finishing it) overwrote the pointer and
 // Resume Practice kept sending the mentee back to it, skipping a still-
 // incomplete earlier sentence entirely.
 //
-// Completion rules:
+// Bug fix #2, found via a real runtime state (practice_attempts row:
+// status='in_progress', current_sentence_order=2, attempt_number=9):
+// content-completion below is judged off assessments.is_accepted —
+// each sentence's BEST-EVER accepted score, across every attempt past
+// or present. That stays TRUE even while a later, still-open
+// PracticeAttempt (a full lesson retry — see practiceAttemptService
+// .getOrCreatePracticeAttempt, which starts a new attempt_number when
+// the mentee re-enters a lesson with no attempt currently in_progress)
+// is mid-way back through the same sentences again. So the stream-based
+// read isn't wrong about history, it's answering the wrong question
+// while a live attempt is open: a mentee sitting in_progress at
+// sentence_order 2 of attempt #9 must not be routed to the Assessment
+// just because attempt #8 already got sentence #2 accepted. An active
+// PracticeAttempt (practice_attempts.status = 'in_progress') is
+// therefore checked FIRST, authoritative over any historical
+// acceptance record, and short-circuits straight to that attempt's
+// current sentence — the stream-based first-incomplete-item scan below
+// only runs once there is no such live attempt (mentee hasn't started,
+// or a prior attempt fully wrapped with nothing left open).
+//
+// Completion rules (once no active attempt applies):
 //   content (sentence)    -> mentee has an accepted assessment
 //                            (assessments.is_accepted = TRUE, joined
 //                            through its practice_session) for that
@@ -143,16 +165,56 @@ function locateInStream(stream, itemType, itemId) {
 //   assessment (exercise) -> mentee has at least one exercise_attempts
 //                            row with passed = TRUE for that exercise
 //
-// Returns null for a missing/empty course. Otherwise
-// { status: 'incomplete', item } for the first incomplete stream entry,
-// or { status: 'complete', item } once every item is done — item is
-// then the LAST assessment in the stream (its result screen) when the
-// course has one, else the first stream item (nothing left to resume
-// into but the start, for review).
+// Returns null for a missing/empty course. Otherwise one of:
+//   { status: 'attempt_in_progress', item, activeAttempt: { id, attemptNumber, currentSentenceOrder } }
+//   { status: 'incomplete', item }   — first incomplete stream entry
+//   { status: 'complete', item }     — every item done; item is the
+//                                      LAST assessment in the stream
+//                                      (its result screen) when the
+//                                      course has one, else the first
+//                                      stream item (nothing left to
+//                                      resume into but the start, for
+//                                      review)
 // ---------------------------------------------------------------------
 async function getResumeItem(courseId, menteeId) {
   const stream = await getCoursePlayStream(courseId);
   if (!stream || !stream.length) return null;
+
+  const activeAttempt = await PracticeAttempt.findOne({
+    where: {
+      mentee_id: menteeId,
+      lesson_id: courseId,
+      status: PRACTICE_ATTEMPT_STATUSES.IN_PROGRESS,
+    },
+    order: [["created_at", "DESC"]],
+  });
+
+  if (activeAttempt) {
+    const currentSentence = await LessonSentence.findOne({
+      where: { lesson_id: courseId, sentence_order: activeAttempt.current_sentence_order },
+    });
+
+    // Best-effort mapping onto the stream's { item_type, id } shape so
+    // this response stays consistent with the other statuses below —
+    // falls back to the first content entry when current_sentence_order
+    // points past the end of the stream (e.g. the attempt is sitting on
+    // the last sentence, awaiting its /complete call) or the sentence
+    // was deleted since the attempt started.
+    const item =
+      (currentSentence && stream.find((entry) => entry.item_type === "content" && entry.id === currentSentence.id)) ||
+      stream.find((entry) => entry.item_type === "content") ||
+      stream[0];
+
+    return {
+      status: "attempt_in_progress",
+      item,
+      activeAttempt: {
+        id: activeAttempt.id,
+        attemptNumber: activeAttempt.attempt_number,
+        currentSentenceOrder: activeAttempt.current_sentence_order,
+      },
+    };
+  }
 
   const contentIds = stream.filter((entry) => entry.item_type === "content").map((entry) => entry.id);
   const assessmentIds = stream

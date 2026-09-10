@@ -114,6 +114,38 @@ export function defaultBlocks() {
   return [createEmptyBlock("main_text", 1)];
 }
 
+const PREVIEW_MAX_LENGTH = 45;
+
+function stripHtml(html) {
+  return String(html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Bug fix: tree/structure views and curriculum lists were labeling
+// content nodes "Sentence #{sentence_order}" instead of showing what
+// the sentence actually says. Resolution order: the main_text block's
+// text (content_blocks, the canonical source per blocksFromSentence
+// above) -> the legacy sentence_text column (kept in sync with
+// main_text by lessonSentenceController, so this is a real fallback,
+// not stale data) -> "Content #{sentence_order}" only when both are
+// empty/missing (e.g. a brand-new row with no text saved yet).
+export function getContentPreviewLabel(sentence, { maxLength = PREVIEW_MAX_LENGTH } = {}) {
+  const contentBlocks = parseContentBlocks(sentence?.content_blocks);
+  const mainBlock =
+    (contentBlocks || []).find((block) => block.type === "main_text") ||
+    (contentBlocks || [])[0];
+
+  const rawText = stripHtml(mainBlock?.text) || stripHtml(sentence?.sentence_text);
+
+  if (!rawText) {
+    return `Content #${sentence?.sentence_order ?? sentence?.order_index ?? "?"}`;
+  }
+
+  return rawText.length > maxLength ? `${rawText.slice(0, maxLength).trim()}...` : rawText;
+}
+
 // Serializes blocks into a submittable content_blocks payload +
 // appends the actual File objects to formData under indexed
 // fieldnames the backend's dynamic upload middleware understands

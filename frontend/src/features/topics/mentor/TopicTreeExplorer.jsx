@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronRight, ChevronDown, FolderPlus, FileText, ClipboardList, Plus, Trash2 } from "lucide-react";
 import ConfirmModal from "../../../components/ConfirmModal";
 import { createTopic, deleteTopic } from "../../../services/topicService";
+import { getContentPreviewLabel } from "../../../utils/sentenceBlocks";
 import toast from "react-hot-toast";
 
 // Recursive Collapsible Tree Explorer — mentor Content Manager for the
@@ -90,7 +91,7 @@ function TopicNode({ node, depth, onAddSubtopic, onAddContent, onAddAssessment, 
           {contents.map((content) => (
             <div key={`c-${content.id}`} className="flex items-center gap-2 py-1.5 text-sm text-gray-600">
               <FileText size={13} className="text-gray-400 shrink-0" />
-              Sentence #{content.sentence_order}
+              {getContentPreviewLabel(content)}
             </div>
           ))}
           {assessments.map((assessment) => (

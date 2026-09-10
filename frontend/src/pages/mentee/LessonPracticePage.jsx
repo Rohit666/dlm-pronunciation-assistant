@@ -21,7 +21,7 @@ import {
 import PrimaryButton from "../../components/common/PrimaryButton";
 import ExerciseListSection from "../../features/exercises/ExerciseListSection";
 import {
-  getCourseProgress,
+  getCourseResume,
   updateCourseProgress,
 } from "../../services/courseStreamService";
 function LessonPracticePage() {
@@ -30,21 +30,26 @@ function LessonPracticePage() {
   const [loading, setLoading] = useState(true);
   const [lesson, setLesson] = useState(null);
   const [activeAttempt, setActiveAttempt] = useState(null);
-  // Hierarchical Content Tree — resume pointer. When the mentee's last
-  // touched item in this course was an assessment (not the sentence
-  // set), "Resume Practice" sends them straight back to it instead of
-  // always defaulting to the sentence player.
+  // Resume pointer — resolved server-side to the FIRST incomplete item
+  // in the course stream (see getCourseResume/getResumeItem), not the
+  // raw "last touched" pointer. Only set when that resolved item is an
+  // assessment; a resolved content item still routes to the sentence
+  // flow below (activeAttempt/handleStartPractice) — the sentence
+  // runner has no per-sentence deep link yet (same architectural limit
+  // already documented on AssessmentPlayerPage's goToNextStreamItem),
+  // so "resume to a specific sentence" means "resume/start this
+  // lesson's attempt", which is exactly what that flow already does.
   const [resumeAssessmentId, setResumeAssessmentId] = useState(null);
   const navigate = useNavigate();
 
   const fetchData = async () => {
     try {
-      const [lessonResponse, sentenceResponse, attemptResponse, progressResponse] =
+      const [lessonResponse, sentenceResponse, attemptResponse, resumeResponse] =
         await Promise.all([
           api.get(`/lessons/${lessonId}`),
           api.get(`/lesson-sentences/${lessonId}`),
           getActiveAttempt(lessonId),
-          getCourseProgress(lessonId).catch(() => null),
+          getCourseResume(lessonId).catch(() => null),
         ]);
 
       setLesson(lessonResponse.data.lesson);
@@ -53,8 +58,30 @@ function LessonPracticePage() {
 
       setActiveAttempt(attemptResponse.attempt);
 
-      if (progressResponse?.progress?.itemType === "assessment") {
-        setResumeAssessmentId(progressResponse.progress.itemId);
+      // Bug fix: this used to trust mentee_course_progress's raw
+      // "last touched" pointer, so opening the Assessment before
+      // finishing an earlier sentence made Resume Practice skip
+      // straight to it. getCourseResume resolves the first incomplete
+      // stream item server-side — only route to the assessment when
+      // that resolved item genuinely is one.
+      //
+      // Second bug fix, on top: a resolved "complete"/"incomplete"
+      // read off assessments.is_accepted can be stale relative to an
+      // OPEN retry — is_accepted reflects each sentence's best-ever
+      // accepted score across every attempt, past or present, and
+      // stays true even while a later attempt is mid-way back through
+      // the same sentences. status === "attempt_in_progress" is the
+      // resolver's own signal that a live PracticeAttempt takes
+      // priority over that historical read — never treat its `item`
+      // as the assessment target in that case; activeAttempt (fetched
+      // above, straight off practice_attempts) is the correct resume
+      // target, and the existing activeAttempt branch below already
+      // handles it.
+      if (
+        resumeResponse?.status !== "attempt_in_progress" &&
+        resumeResponse?.item?.item_type === "assessment"
+      ) {
+        setResumeAssessmentId(resumeResponse.item.id);
       }
     } catch (error) {
       console.error(error);
@@ -86,15 +113,21 @@ function LessonPracticePage() {
   };
 
   const handleResumeOrStart = () => {
+    // Defense in depth, on top of the fetchData guard above: a live
+    // activeAttempt (straight off practice_attempts.status =
+    // 'in_progress') always wins over resumeAssessmentId. It should
+    // never be set at the same time as an active attempt now, but if
+    // it ever is, an open attempt is ground truth for "the mentee is
+    // still mid-lesson" and must not be skipped past.
+    if (activeAttempt) {
+      navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${activeAttempt.id}`);
+      return;
+    }
     if (resumeAssessmentId) {
       navigate(ROUTES.assessmentPlayer(lessonId, resumeAssessmentId));
       return;
     }
-    if (activeAttempt) {
-      navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${activeAttempt.id}`);
-    } else {
-      handleStartPractice();
-    }
+    handleStartPractice();
   };
   return (
     <DashboardLayout>
