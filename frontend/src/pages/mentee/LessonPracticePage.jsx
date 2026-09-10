@@ -40,6 +40,11 @@ function LessonPracticePage() {
   // so "resume to a specific sentence" means "resume/start this
   // lesson's attempt", which is exactly what that flow already does.
   const [resumeAssessmentId, setResumeAssessmentId] = useState(null);
+  // status === "completed" from getCourseResume/getResumeItem: every
+  // step in the course stream is done. The primary action becomes
+  // "Practice Again", starting a brand-new attempt from step 0 rather
+  // than resuming anything.
+  const [courseCompleted, setCourseCompleted] = useState(false);
   const navigate = useNavigate();
 
   const fetchData = async () => {
@@ -65,24 +70,29 @@ function LessonPracticePage() {
       // stream item server-side — only route to the assessment when
       // that resolved item genuinely is one.
       //
-      // Second bug fix, on top: a resolved "complete"/"incomplete"
+      // Second bug fix, on top: a resolved "completed"/"incomplete"
       // read off assessments.is_accepted can be stale relative to an
       // OPEN retry — is_accepted reflects each sentence's best-ever
       // accepted score across every attempt, past or present, and
       // stays true even while a later attempt is mid-way back through
       // the same sentences. status === "attempt_in_progress" is the
       // resolver's own signal that a live PracticeAttempt takes
-      // priority over that historical read — never treat its `item`
-      // as the assessment target in that case; activeAttempt (fetched
+      // priority over that historical read; activeAttempt (fetched
       // above, straight off practice_attempts) is the correct resume
-      // target, and the existing activeAttempt branch below already
-      // handles it.
-      if (
-        resumeResponse?.status !== "attempt_in_progress" &&
-        resumeResponse?.item?.item_type === "assessment"
-      ) {
+      // target there, and the existing activeAttempt branch below
+      // already handles it.
+      //
+      // Third: status === "incomplete" is the ONLY case where `item`
+      // is genuinely "the next thing to do" — an allow-list, not a
+      // negative exclusion, so "completed" (where `item` is just a
+      // Review Course landing point, stream[0], not a target to route
+      // into) can never accidentally set this even if that first step
+      // happens to be an assessment.
+      if (resumeResponse?.status === "incomplete" && resumeResponse.item?.item_type === "assessment") {
         setResumeAssessmentId(resumeResponse.item.id);
       }
+
+      setCourseCompleted(resumeResponse?.status === "completed");
     } catch (error) {
       console.error(error);
 
@@ -113,6 +123,16 @@ function LessonPracticePage() {
   };
 
   const handleResumeOrStart = () => {
+    // Checked first: once the course is fully completed there is
+    // nothing to resume into — "Practice Again" always starts a fresh
+    // attempt from step 0 (handleStartPractice already does exactly
+    // that: no in_progress PracticeAttempt exists once completed, so
+    // getOrCreatePracticeAttempt server-side mints a new attempt_number
+    // rather than resuming an old one).
+    if (courseCompleted) {
+      handleStartPractice();
+      return;
+    }
     // Defense in depth, on top of the fetchData guard above: a live
     // activeAttempt (straight off practice_attempts.status =
     // 'in_progress') always wins over resumeAssessmentId. It should
@@ -129,6 +149,12 @@ function LessonPracticePage() {
     }
     handleStartPractice();
   };
+
+  const primaryButtonLabel = courseCompleted
+    ? "Practice Again"
+    : resumeAssessmentId || activeAttempt
+      ? "Resume Practice"
+      : "Start Practice";
   return (
     <DashboardLayout>
       <PageHeader
@@ -140,7 +166,7 @@ function LessonPracticePage() {
           ← Back to Lessons
         </button>
         <PrimaryButton onClick={handleResumeOrStart}>
-          {resumeAssessmentId || activeAttempt ? "Resume Practice" : "Start Practice"}
+          {primaryButtonLabel}
         </PrimaryButton>
       </div>
       <div className="bg-white rounded-3xl shadow-sm p-6 mb-8">
@@ -281,7 +307,7 @@ function LessonPracticePage() {
               Start Practice
             </button> */}
             <PrimaryButton onClick={handleResumeOrStart}>
-              {resumeAssessmentId || activeAttempt ? "Resume Practice" : "Start Practice"}
+              {primaryButtonLabel}
             </PrimaryButton>
           </div>
         </div>

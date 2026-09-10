@@ -5,8 +5,9 @@ import PageHeader from "../../components/PageHeader";
 import PrimaryButton from "../../components/common/PrimaryButton";
 import SecondaryButton from "../../components/common/SecondaryButton";
 import { getPracticeAttempt } from "../../services/practiceAttemptService";
-import { getCourseStream } from "../../services/courseStreamService";
+import { getCourseStream, getCourseResume } from "../../services/courseStreamService";
 import { ROUTES } from "../../constants/routes";
+import CourseCompletedScreen from "../../features/exercises/CourseCompletedScreen";
 
 // Self-paced (Requirement 1.1): completion no longer waits on mentor
 // review. `attempt.status === "submitted"` means the computed
@@ -26,9 +27,17 @@ function PracticeCompletePage() {
   // to check "what's next in the course stream" is right here, once
   // that whole content block is done.
   const [nextStreamItem, setNextStreamItem] = useState(null);
+  // The spec's Course Completion Screen applies whether the final
+  // stream item was a content block or an exercise — this page is the
+  // content-block landing spot, so it needs the same getCourseResume
+  // check AssessmentPlayerPage's handleFinishCourse does, not just the
+  // "Continue to Next" seam that already existed here.
+  const [courseStats, setCourseStats] = useState(null);
+  const [courseFinished, setCourseFinished] = useState(false);
   useEffect(() => {
     loadAttempt();
     loadNextStreamItem();
+    loadResume();
   }, []);
   const loadAttempt = async () => {
     try {
@@ -50,6 +59,18 @@ function PracticeCompletePage() {
       const lastContentIndex = Math.max(...contentIndexes);
       if (lastContentIndex < stream.length - 1) {
         setNextStreamItem(stream[lastContentIndex + 1]);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const loadResume = async () => {
+    try {
+      const resume = await getCourseResume(lessonId);
+      if (resume?.status === "completed") {
+        setCourseStats(resume.stats || null);
+        setCourseFinished(true);
       }
     } catch (error) {
       console.error(error);
@@ -80,6 +101,14 @@ function PracticeCompletePage() {
             text-center
           "
         >
+          {passed && courseFinished ? (
+            <CourseCompletedScreen
+              stats={courseStats}
+              onBackToLessons={() => navigate(ROUTES.MENTEE_LESSONS)}
+              onReviewCourse={() => navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}`)}
+            />
+          ) : (
+            <>
           <div className="text-7xl">{passed ? "🎉" : "💪"}</div>
 
           <h1
@@ -155,6 +184,8 @@ function PracticeCompletePage() {
               </PrimaryButton>
             )}
           </div>
+            </>
+          )}
         </div>
       </div>
     </DashboardLayout>

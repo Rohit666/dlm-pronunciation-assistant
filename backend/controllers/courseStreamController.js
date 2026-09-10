@@ -97,10 +97,13 @@ exports.getResumeTarget = async (req, res) => {
       success: true,
       status: resume.status,
       item: resume.item,
+      is_finished: resume.is_finished,
       // Present only for status === "attempt_in_progress" — see
       // getResumeItem for why an open practice_attempts row overrides
       // the stream-based completion read.
       activeAttempt: resume.activeAttempt || null,
+      // Present only for status === "completed".
+      stats: resume.stats || null,
     });
   } catch (error) {
     console.error(error);

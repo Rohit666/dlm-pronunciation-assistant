@@ -11,10 +11,12 @@ import { ROUTES } from "../../constants/routes";
 import { getExercise, submitExercise } from "../../services/exerciseService";
 import {
   getCourseStream,
+  getCourseResume,
   updateCourseProgress,
 } from "../../services/courseStreamService";
 import QUESTION_TYPES from "../../constants/exerciseQuestionTypes";
 import ReportCard from "./ReportCard";
+import CourseCompletedScreen from "./CourseCompletedScreen";
 
 // ---------------------------------------------------------------------
 // Full-width assessment player. Replaces ExercisePlayerModal (deprecated
@@ -222,8 +224,29 @@ function AssessmentPlayerPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [nextStreamItem, setNextStreamItem] = useState(null);
+  // Set once the mentee finishes the FINAL stream item from inside this
+  // player (this assessment had no next item) — swaps the ReportCard's
+  // action row for the Course Completed screen below.
+  const [courseFinished, setCourseFinished] = useState(false);
+  const [courseStats, setCourseStats] = useState(null);
+  const [finishingCourse, setFinishingCourse] = useState(false);
 
   useEffect(() => {
+    // Deliverable #4: params.exerciseId changing (back-to-back exercises
+    // in the same topic navigate here directly, this component never
+    // unmounts) must fully flush the previous assessment's local state —
+    // otherwise stale answers/currentIndex/result/report-card state from
+    // Exercise 1 bleed into Exercise 2 for a frame, and a stale
+    // nextStreamItem can point at the WRONG next step.
+    setAnswers({});
+    setCurrentIndex(0);
+    setConfirmOpen(false);
+    setSubmitting(false);
+    setResult(null);
+    setNextStreamItem(null);
+    setCourseFinished(false);
+    setCourseStats(null);
+
     (async () => {
       try {
         setLoading(true);
@@ -310,6 +333,31 @@ function AssessmentPlayerPage() {
     }
   };
 
+  // This assessment had no next stream item — re-resolve against the
+  // server (rather than trusting the client-side "no next item" read
+  // blindly) so the Course Completed stats are always the authoritative
+  // getResumeItem numbers, and so a mentee who somehow still has an
+  // incomplete step left (e.g. jumped here out of order) gets routed
+  // back to it instead of a false completion screen.
+  const handleFinishCourse = async () => {
+    try {
+      setFinishingCourse(true);
+      const resume = await getCourseResume(lessonId);
+      if (resume?.status === "completed") {
+        setCourseStats(resume.stats || null);
+        setCourseFinished(true);
+      } else {
+        toast.error("Another step is still incomplete — resuming there instead.");
+        navigate(`${ROUTES.MENTEE_LESSONS}/${lessonId}`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load course completion status");
+    } finally {
+      setFinishingCourse(false);
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -348,7 +396,15 @@ function AssessmentPlayerPage() {
             />
           )}
 
-          {result ? (
+          {courseFinished ? (
+            <div className="mt-8">
+              <CourseCompletedScreen
+                stats={courseStats}
+                onBackToLessons={() => navigate(ROUTES.MENTEE_LESSONS)}
+                onReviewCourse={() => navigate(`${ROUTES.MENTEE_LESSONS}/${lessonId}`)}
+              />
+            </div>
+          ) : result ? (
             <div className="mt-8">
               <ReportCard
                 attempt={result.attempt}
@@ -362,10 +418,16 @@ function AssessmentPlayerPage() {
                     >
                       Retake Exercise
                     </button>
-                    <PrimaryButton onClick={goToNextStreamItem}>
-                      {nextStreamItem ? "Continue" : "Back to Lesson"}
-                      <ArrowRight size={16} className="inline ml-2" />
-                    </PrimaryButton>
+                    {nextStreamItem ? (
+                      <PrimaryButton onClick={goToNextStreamItem}>
+                        Next Activity
+                        <ArrowRight size={16} className="inline ml-2" />
+                      </PrimaryButton>
+                    ) : (
+                      <PrimaryButton onClick={handleFinishCourse} disabled={finishingCourse}>
+                        {finishingCourse ? "Finishing..." : "Finish Course"}
+                      </PrimaryButton>
+                    )}
                   </>
                 }
               />

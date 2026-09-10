@@ -9,6 +9,39 @@ const {
   PracticeAttempt,
 } = require("../models");
 const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses");
+const { parseJsonField } = require("../utils/jsonHelper");
+const { round2 } = require("../utils/numberUtils");
+
+const TITLE_MAX_LENGTH = 45;
+
+function stripHtml(html) {
+  return String(html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Server-side mirror of frontend/src/utils/sentenceBlocks.js's
+// getContentPreviewLabel — same resolution order (main_text block ->
+// legacy sentence_text -> "Content #N" fallback) and truncation, so a
+// content step's title is consistent wherever it's shown (mentor tree,
+// mentee stream). Kept local rather than shared cross-runtime since
+// there's no existing JS module shared between backend and frontend in
+// this repo.
+function resolveContentTitle(content) {
+  const contentBlocks = parseJsonField(content.content_blocks);
+  const mainBlock =
+    contentBlocks.find((block) => block.type === "main_text") || contentBlocks[0];
+  const rawText = stripHtml(mainBlock?.text) || stripHtml(content.sentence_text);
+
+  if (!rawText) {
+    return `Content #${content.sentence_order}`;
+  }
+
+  return rawText.length > TITLE_MAX_LENGTH
+    ? `${rawText.slice(0, TITLE_MAX_LENGTH).trim()}...`
+    : rawText;
+}
 
 // ---------------------------------------------------------------------
 // Linearized Course Play Stream.
@@ -29,8 +62,15 @@ const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses"
 // convention every caller (stream, resume, mentor tree explorer) agrees
 // on.
 //
-// Output shape (exactly the spec'd contract):
-//   [{ item_type: 'content'|'assessment', id, topic_id, topic_path }]
+// Output shape:
+//   [{ step_index, item_type: 'content'|'assessment', id, title, topic_id, topic_path }]
+// step_index is this entry's position in the flattened array (0-based,
+// strictly ascending, assigned in the same single pass that walks the
+// tree — so sibling order via sentence_order/order_index is preserved
+// exactly, and two back-to-back assessments still get their own
+// individual, sequential step_index values, never sharing one). title
+// is a human-readable label — resolveContentTitle for content, the
+// LessonExercise's own `title` column for an assessment.
 // ---------------------------------------------------------------------
 
 async function getCoursePlayStream(courseId) {
@@ -86,16 +126,20 @@ async function getCoursePlayStream(courseId) {
 
     for (const content of contentsByTopic.get(key) || []) {
       stream.push({
+        step_index: stream.length,
         item_type: "content",
         id: content.id,
+        title: resolveContentTitle(content),
         topic_id: topicId,
         topic_path: path,
       });
     }
     for (const assessment of assessmentsByTopic.get(key) || []) {
       stream.push({
+        step_index: stream.length,
         item_type: "assessment",
         id: assessment.id,
+        title: assessment.title,
         topic_id: topicId,
         topic_path: path,
       });
@@ -162,19 +206,25 @@ function locateInStream(stream, itemType, itemId) {
 //                            (assessments.is_accepted = TRUE, joined
 //                            through its practice_session) for that
 //                            lesson_sentence
-//   assessment (exercise) -> mentee has at least one exercise_attempts
-//                            row with passed = TRUE for that exercise
+//   assessment (exercise) -> mentee has AT LEAST ONE exercise_attempts
+//                            row for that exercise (any outcome, not
+//                            just passed). Requiring a PASS here would
+//                            let a mentee who keeps failing get stuck
+//                            re-taking the same exercise forever with no
+//                            way to move the stream forward — one
+//                            genuine attempt satisfies progression; a
+//                            passing score is what retakes are for, not
+//                            what unblocks the next step.
 //
 // Returns null for a missing/empty course. Otherwise one of:
-//   { status: 'attempt_in_progress', item, activeAttempt: { id, attemptNumber, currentSentenceOrder } }
-//   { status: 'incomplete', item }   — first incomplete stream entry
-//   { status: 'complete', item }     — every item done; item is the
-//                                      LAST assessment in the stream
-//                                      (its result screen) when the
-//                                      course has one, else the first
-//                                      stream item (nothing left to
-//                                      resume into but the start, for
-//                                      review)
+//   { status: 'attempt_in_progress', item, activeAttempt: { id, attemptNumber, currentSentenceOrder }, is_finished: false }
+//   { status: 'incomplete', item, is_finished: false }         — first incomplete stream entry
+//   { status: 'completed', item, is_finished: true, stats }    — every
+//     step done. item is the first stream entry (a "Review Course"
+//     landing point — there's no single natural "next" item once
+//     nothing is left); stats is getCourseCompletionStats' summary,
+//     computed here without a second pass since the completion scan
+//     already has everything it needs.
 // ---------------------------------------------------------------------
 async function getResumeItem(courseId, menteeId) {
   const stream = await getCoursePlayStream(courseId);
@@ -208,6 +258,7 @@ async function getResumeItem(courseId, menteeId) {
     return {
       status: "attempt_in_progress",
       item,
+      is_finished: false,
       activeAttempt: {
         id: activeAttempt.id,
         attemptNumber: activeAttempt.attempt_number,
@@ -221,7 +272,7 @@ async function getResumeItem(courseId, menteeId) {
     .filter((entry) => entry.item_type === "assessment")
     .map((entry) => entry.id);
 
-  const [acceptedAssessments, passedAttempts] = await Promise.all([
+  const [acceptedAssessments, exerciseAttempts] = await Promise.all([
     contentIds.length
       ? Assessment.findAll({
           where: { is_accepted: true },
@@ -236,7 +287,7 @@ async function getResumeItem(courseId, menteeId) {
       : [],
     assessmentIds.length
       ? ExerciseAttempt.findAll({
-          where: { mentee_id: menteeId, exercise_id: assessmentIds, passed: true },
+          where: { mentee_id: menteeId, exercise_id: assessmentIds },
         })
       : [],
   ]);
@@ -244,7 +295,7 @@ async function getResumeItem(courseId, menteeId) {
   const completedContentIds = new Set(
     acceptedAssessments.map((assessment) => assessment.PracticeSession.lesson_sentence_id),
   );
-  const completedAssessmentIds = new Set(passedAttempts.map((attempt) => attempt.exercise_id));
+  const completedAssessmentIds = new Set(exerciseAttempts.map((attempt) => attempt.exercise_id));
 
   const isComplete = (entry) =>
     entry.item_type === "content"
@@ -253,11 +304,46 @@ async function getResumeItem(courseId, menteeId) {
 
   const firstIncomplete = stream.find((entry) => !isComplete(entry));
   if (firstIncomplete) {
-    return { status: "incomplete", item: firstIncomplete };
+    return { status: "incomplete", item: firstIncomplete, is_finished: false };
   }
 
-  const lastAssessment = [...stream].reverse().find((entry) => entry.item_type === "assessment");
-  return { status: "complete", item: lastAssessment || stream[0] };
+  // Every step complete. Judgment call, disclosed: "overall average
+  // score" isn't defined precisely in the spec, so it's the mean of two
+  // 0-100 quantities pooled together — each accepted sentence's
+  // overall_accuracy, and each attempted exercise's BEST percentage
+  // across its attempts (so a passed retake counts at its improved
+  // score, not its first failing one). null, not 0, when there's
+  // nothing to average (a course with steps but no scorable outcome
+  // yet, which shouldn't happen once every step is complete, but stays
+  // honest rather than reporting a fake 0 if it ever does).
+  const bestPercentageByExercise = new Map();
+  for (const attempt of exerciseAttempts) {
+    const current = bestPercentageByExercise.get(attempt.exercise_id);
+    const percentage = Number(attempt.percentage);
+    if (current === undefined || percentage > current) {
+      bestPercentageByExercise.set(attempt.exercise_id, percentage);
+    }
+  }
+  const scores = [
+    ...acceptedAssessments.map((assessment) => Number(assessment.overall_accuracy)),
+    ...bestPercentageByExercise.values(),
+  ];
+  const overallAverageScore = scores.length
+    ? round2(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+    : null;
+
+  return {
+    status: "completed",
+    item: stream[0],
+    is_finished: true,
+    stats: {
+      totalContents: contentIds.length,
+      completedContents: completedContentIds.size,
+      totalAssessments: assessmentIds.length,
+      assessmentsTaken: bestPercentageByExercise.size,
+      overallAverageScore,
+    },
+  };
 }
 
 module.exports = { getCoursePlayStream, locateInStream, getResumeItem };
