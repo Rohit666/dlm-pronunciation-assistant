@@ -119,11 +119,21 @@ async function getMenteeOverview(menteeId) {
 }
 
 // Milestone 5 — GET /api/analytics/mentee/phonemes
+//
+// Blast-radius fix (found while removing `similarity` from
+// phoneme_assessments, not part of the schema-correction's stated file
+// list, but left in would break this query at runtime with
+// "Unknown column 'pa.similarity'"): weakestPhonemes previously ranked
+// by AVG(pa.similarity) ASC. error_rate was already discrete
+// (operation <> 'exact_match') and needed no change; it's now also the
+// ordering column — "weakest first" is unchanged, just driven by the
+// error rate instead of a synthetic similarity average. .symbol and
+// .errorRate are the only fields recommendationService.js and
+// menteeDashboardController.js consume — both preserved exactly.
 async function getMenteePhonemes(menteeId) {
   const weakestPhonemes = await sequelize.query(
     `SELECT
        pa.expected_symbol,
-       AVG(pa.similarity) AS average_similarity,
        AVG(CASE WHEN pa.operation <> 'exact_match' THEN 1 ELSE 0 END) * 100 AS error_rate,
        COUNT(*) AS occurrences
      FROM phoneme_assessments pa
@@ -133,7 +143,7 @@ async function getMenteePhonemes(menteeId) {
      WHERE ps.mentee_id = :menteeId AND a.is_accepted = TRUE
        AND pa.expected_symbol IS NOT NULL
      GROUP BY pa.expected_symbol
-     ORDER BY average_similarity ASC
+     ORDER BY error_rate DESC
      LIMIT :limit`,
     {
       replacements: { menteeId, limit: WEAKEST_PHONEMES_LIMIT },
@@ -163,11 +173,16 @@ async function getMenteePhonemes(menteeId) {
 
   // One point per submitted session (not per phoneme instance) — the
   // mentee's overall phoneme accuracy for that session, chronological.
+  // Same blast-radius fix as weakestPhonemes above: AVG(pa.similarity)
+  // replaced with a discrete exact-match rate
+  // (SUM(matched=TRUE)/COUNT(*) * 100) — same 0-100 scale a similarity
+  // average produced, so the trend line's shape is preserved even
+  // though the underlying metric is now discrete.
   const trajectoryRows = await sequelize.query(
     `SELECT
        a.id AS assessment_id,
        a.created_at AS submitted_at,
-       AVG(pa.similarity) AS average_similarity
+       SUM(CASE WHEN pa.matched = TRUE THEN 1 ELSE 0 END) / COUNT(*) * 100 AS exact_match_rate
      FROM assessments a
      INNER JOIN practice_sessions ps ON ps.id = a.practice_session_id
      INNER JOIN word_assessments wa ON wa.assessment_id = a.id
@@ -186,7 +201,6 @@ async function getMenteePhonemes(menteeId) {
   return {
     weakestPhonemes: weakestPhonemes.map((row) => ({
       symbol: row.expected_symbol,
-      averageSimilarity: round2(row.average_similarity),
       errorRate: round2(row.error_rate),
       occurrences: Number(row.occurrences),
     })),
@@ -204,7 +218,7 @@ async function getMenteePhonemes(menteeId) {
       .map((row) => ({
         assessmentId: row.assessment_id,
         submittedAt: row.submitted_at,
-        averageSimilarity: round2(row.average_similarity),
+        exactMatchRate: round2(row.exact_match_rate),
       })),
   };
 }

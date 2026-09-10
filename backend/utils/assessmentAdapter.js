@@ -31,22 +31,39 @@ function assertRange(value, min, max, label) {
   }
 }
 
+// Discrete evidence only — no synthetic similarity float is read off
+// step.relationship or stored at the phoneme row level (see the
+// remove-similarity-from-phoneme-assessments migration). `position` is
+// this step's index in the post-filter array (matches
+// phoneme_assessments.position + the (word_assessment_id, position)
+// index). `matched` mirrors the operation as a boolean for cheap
+// aggregate queries. expected_stress/expected_secondary_stress/
+// expected_long/expected_category are read straight off the expected
+// PhonemeToken (ai-runtime app/models/phoneme_token.py: stress,
+// secondary_stress, long, category) — null/undefined on an insertion,
+// where there is no expected token, so they fall back to false/null.
 function normalizePhonemeSteps(word) {
   const steps = word?.pronunciation?.phoneme_comparison?.steps;
   if (!Array.isArray(steps)) return [];
 
   return steps
     .filter((step) => step?.expected || step?.detected)
-    .map((step) => ({
-      expected_symbol: step.expected?.symbol ?? null,
-      detected_symbol: step.detected?.symbol ?? null,
-      operation: step.operation ?? "exact_match",
-      similarity:
-        typeof step.relationship?.similarity === "number"
-          ? step.relationship.similarity
-          : null,
-      changed_features: step.relationship?.changed_features ?? [],
-    }));
+    .map((step, index) => {
+      const operation = step.operation ?? "exact_match";
+      const expected = step.expected;
+      return {
+        position: index,
+        expected_symbol: expected?.symbol ?? null,
+        detected_symbol: step.detected?.symbol ?? null,
+        operation,
+        matched: operation === "exact_match",
+        expected_stress: Boolean(expected?.stress),
+        expected_secondary_stress: Boolean(expected?.secondary_stress),
+        expected_long: Boolean(expected?.long),
+        expected_category: expected?.category ?? null,
+        changed_features: step.relationship?.changed_features ?? [],
+      };
+    });
 }
 
 function normalizeWord(word, index) {
