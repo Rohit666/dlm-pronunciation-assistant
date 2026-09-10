@@ -68,19 +68,52 @@ function gradeChoiceQuestion(question, studentAnswer) {
   };
 }
 
+// Bug 2 fix: two real defects here before this — (1) content_payload's
+// documented `case_sensitive` flag was never actually read; every
+// comparison went through normalizeText, which always lowercases;
+// (2) multi-blank submissions arrive as one comma-joined string
+// ("is,Now") with one acceptable answer per blank (acceptable_answers[i]
+// is that blank's answer, positional) — a single
+// `acceptable.includes(wholeString)` check can never match that shape,
+// so a fully-correct multi-blank answer always graded wrong.
 function gradeFillBlank(question, studentAnswer) {
   const rubric = question.grading_rubric || {};
-  const acceptable = (rubric.acceptable_answers || []).map(normalizeText);
-  const isCorrect = acceptable.includes(normalizeText(studentAnswer));
+  const payload = question.content_payload || {};
+  const acceptable = rubric.acceptable_answers || [];
+  const caseSensitive = Boolean(payload.case_sensitive);
+
+  const normalize = (value) => {
+    const text = typeof value === "string" ? value.trim() : "";
+    return caseSensitive ? text : text.toLowerCase();
+  };
+
+  let isCorrect = false;
+
+  if (
+    acceptable.length > 1 &&
+    typeof studentAnswer === "string" &&
+    studentAnswer.includes(",")
+  ) {
+    const studentTokens = studentAnswer.split(",").map((token) => token.trim());
+    if (studentTokens.length === acceptable.length) {
+      isCorrect = studentTokens.every(
+        (token, index) => normalize(token) === normalize(acceptable[index]),
+      );
+    }
+  }
+
+  // Single-blank path — also the fallback when a multi-answer rubric's
+  // submission isn't the expected comma-joined shape.
+  if (!isCorrect) {
+    isCorrect = acceptable.some((answer) => normalize(answer) === normalize(studentAnswer));
+  }
 
   return {
     isCorrect,
     scoreAwarded: isCorrect ? question.points : 0,
     feedback:
       rubric.explanation ||
-      (rubric.acceptable_answers?.length
-        ? `Accepted answers: ${rubric.acceptable_answers.join(", ")}`
-        : ""),
+      (acceptable.length ? `Accepted answers: ${acceptable.join(", ")}` : ""),
   };
 }
 

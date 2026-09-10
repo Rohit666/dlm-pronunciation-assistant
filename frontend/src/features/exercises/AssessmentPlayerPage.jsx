@@ -216,23 +216,93 @@ function isAnswered(question, answer) {
   return answer !== undefined && answer !== null && answer !== "";
 }
 
-function answerSheetDisplay(entry) {
-  if (entry.questionType === QUESTION_TYPES.SENTENCE_FORMATION) {
-    const tokenById = new Map(
-      (entry.contentPayload?.tokens || []).map((t) => [String(t.id), t.text]),
-    );
-    const words = (entry.studentAnswer || []).map((id) => tokenById.get(String(id)) || "?");
-    return words.length ? words.join(" ") : "(no answer)";
+// Defensive normalizer — same rationale as ExerciseCard.jsx's
+// parseJsonMaybe: the real fix for JSON columns arriving as unparsed
+// strings is the Sequelize getters on ExerciseQuestion/
+// ExerciseAttemptAnswer (MariaDB's JSON type is LONGTEXT under the
+// hood, so mysql2 never auto-parses it there). This is belt-and-
+// suspenders on top of that for contentPayload/gradingRubric/
+// studentAnswer, wherever they enter this file.
+function safeParse(value, fallback) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
   }
-  if (entry.questionType === QUESTION_TYPES.MCQ || entry.questionType === QUESTION_TYPES.TRUE_FALSE) {
-    const option = (entry.contentPayload?.options || []).find(
-      (o) => String(o.id) === String(entry.studentAnswer),
-    );
-    return option ? option.label : entry.studentAnswer || "(no answer)";
-  }
-  return entry.studentAnswer || "(no answer)";
 }
 
+// Bug 1 + Bug 3 fix, shared by both the top-level answer sheet and
+// comprehension's per-sub-question breakdown (same {questionType,
+// contentPayload, studentAnswer} shape either way) — resolves a raw
+// stored answer (an option id, a token-id array) into what a mentee
+// would recognize as their own answer.
+function formatAnswerValue(questionType, contentPayload, rawValue) {
+  const payload = safeParse(contentPayload, {}) || {};
+  const value = safeParse(rawValue, rawValue);
+
+  if (value === null || value === undefined || value === "") return "(no answer)";
+
+  if (questionType === QUESTION_TYPES.MCQ || questionType === QUESTION_TYPES.TRUE_FALSE) {
+    const option = (payload.options || []).find((o) => String(o.id) === String(value));
+    return option ? option.label : String(value);
+  }
+
+  if (questionType === QUESTION_TYPES.SENTENCE_FORMATION) {
+    const tokenIds = Array.isArray(value) ? value : safeParse(value, []) || [];
+    const tokenMap = new Map((payload.tokens || []).map((t) => [String(t.id), t.text]));
+    const words = tokenIds.map((id) => tokenMap.get(String(id)) || "?");
+    return words.length ? words.join(" ") : "(no answer)";
+  }
+
+  if (questionType === QUESTION_TYPES.FILL_BLANK) {
+    // Multi-blank answers are stored comma-joined ("is,Now") — render
+    // as clean, spaced-out text rather than the raw joined string.
+    return typeof value === "string" ? value.split(",").map((v) => v.trim()).join(", ") : String(value);
+  }
+
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+// Bug 4 fix (frontend half) — the answer key each sub-question's grade
+// is measured against, same resolution rules as formatAnswerValue.
+function formatExpectedAnswer(questionType, contentPayload, gradingRubric) {
+  const payload = safeParse(contentPayload, {}) || {};
+  const rubric = safeParse(gradingRubric, {}) || {};
+
+  if (questionType === QUESTION_TYPES.MCQ || questionType === QUESTION_TYPES.TRUE_FALSE) {
+    const option = (payload.options || []).find(
+      (o) => String(o.id) === String(rubric.correct_option_id),
+    );
+    return option ? option.label : rubric.correct_option_id || "—";
+  }
+
+  if (questionType === QUESTION_TYPES.FILL_BLANK) {
+    return (rubric.acceptable_answers || []).join(" / ") || "—";
+  }
+
+  if (questionType === QUESTION_TYPES.SENTENCE_FORMATION) {
+    const tokenMap = new Map((payload.tokens || []).map((t) => [String(t.id), t.text]));
+    const expected = rubric.expected_order || [];
+    return expected.map((id) => tokenMap.get(String(id)) || "?").join(" ") || "—";
+  }
+
+  return rubric.explanation || "—";
+}
+
+function answerSheetDisplay(entry) {
+  return formatAnswerValue(entry.questionType, entry.contentPayload, entry.studentAnswer);
+}
+
+// Bug 4 fix (frontend half) — this used to show only feedback text +
+// score, never the sub-question's own prompt, the mentee's resolved
+// answer, or the expected answer key, so a comprehension entry read as
+// blank even though it was fully graded server-side (subResults already
+// carried all of this — see gradeComprehension in
+// exerciseEvaluationService.js). Same {questionType, contentPayload,
+// gradingRubric, studentAnswer} shape as a top-level answer-sheet entry,
+// so it reuses the exact same formatting helpers.
 function ComprehensionAnswerSheet({ entry }) {
   return (
     <div className="space-y-2 mt-3">
@@ -249,8 +319,22 @@ function ComprehensionAnswerSheet({ entry }) {
             ) : (
               <XCircle size={16} className="text-red-600 shrink-0 mt-0.5" />
             )}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 space-y-1">
               <p className="font-medium text-gray-700">Sub-question {index + 1}</p>
+              <div
+                className="text-gray-700"
+                dangerouslySetInnerHTML={{ __html: sub.prompt || "" }}
+              />
+              <p className="text-gray-600">
+                <span className="font-medium">Your answer: </span>
+                {formatAnswerValue(sub.questionType, sub.contentPayload, sub.studentAnswer)}
+              </p>
+              {!sub.isCorrect && (
+                <p className="text-gray-600">
+                  <span className="font-medium">Expected: </span>
+                  {formatExpectedAnswer(sub.questionType, sub.contentPayload, sub.gradingRubric)}
+                </p>
+              )}
               {sub.feedback && <p className="text-gray-500 mt-1">{sub.feedback}</p>}
               <p className="text-xs text-gray-400 mt-1">
                 {sub.scoreAwarded} / {sub.points} point{sub.points === 1 ? "" : "s"}
@@ -285,7 +369,22 @@ function AnswerSheetRow({ entry, index }) {
         )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-500 mb-1">Question {index + 1}</p>
-          {!isComprehension && (
+          {isComprehension ? (
+            (() => {
+              const payload = safeParse(entry.contentPayload, {}) || {};
+              return payload.passage_html ? (
+                <div className="border-l-4 border-indigo-300 bg-indigo-50/60 rounded-r-lg p-3 mb-2">
+                  <p className="text-xs font-semibold text-indigo-400 mb-1 uppercase tracking-wide">
+                    Reading Passage
+                  </p>
+                  <div
+                    className="text-sm text-gray-700 prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: payload.passage_html }}
+                  />
+                </div>
+              ) : null;
+            })()
+          ) : (
             <div className="text-gray-800 mb-2" dangerouslySetInnerHTML={{ __html: entry.prompt }} />
           )}
           {!isComprehension && (

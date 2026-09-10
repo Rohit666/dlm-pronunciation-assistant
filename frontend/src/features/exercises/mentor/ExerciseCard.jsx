@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  ChevronDown,
-  ChevronUp,
-  Trash2,
-  ClipboardList,
-  CheckCircle2,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, ClipboardList, CheckCircle2 } from "lucide-react";
 
 const QUESTION_TYPE_LABELS = {
   mcq: "Multiple Choice",
@@ -15,15 +9,24 @@ const QUESTION_TYPE_LABELS = {
   comprehension: "Comprehension",
   paragraph: "Paragraph Writing",
 };
-const ensureJson = (val, fallback = {}) => {
-  if (!val) return fallback;
-  if (typeof val === "object") return val;
+
+// Defensive normalizer — the real fix for content_payload/grading_rubric
+// arriving as unparsed JSON strings is the Sequelize getter on
+// ExerciseQuestion.js (MariaDB's JSON type is LONGTEXT under the hood,
+// so mysql2 never auto-parses it there). This is belt-and-suspenders on
+// top of that: if any response ever reaches this component without
+// going through that getter (a stale cached fetch, a future endpoint
+// that bypasses the model), the answer key still renders instead of
+// silently reading undefined off a string.
+function parseJsonMaybe(value, fallback) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== "string") return value;
   try {
-    return JSON.parse(val);
-  } catch (e) {
+    return JSON.parse(value);
+  } catch {
     return fallback;
   }
-};
+}
 
 // Bug 3 fix: this used to render only `prompt` — the mentor could never
 // actually see what was saved as the answer key, which read as "nothing
@@ -34,8 +37,8 @@ const ensureJson = (val, fallback = {}) => {
 // since both carry the same {question_type, content_payload,
 // grading_rubric, points} shape.
 function AnswerKey({ question }) {
-  const rubric = ensureJson(question.grading_rubric) || {};
-  const payload = ensureJson(question.content_payload) || {};
+  const rubric = parseJsonMaybe(question.grading_rubric, {}) || {};
+  const payload = parseJsonMaybe(question.content_payload, {}) || {};
 
   switch (question.question_type) {
     case "mcq":
@@ -44,15 +47,12 @@ function AnswerKey({ question }) {
       return (
         <div className="space-y-1.5 mt-2">
           {options.map((option) => {
-            const isCorrect =
-              String(option.id) === String(rubric.correct_option_id);
+            const isCorrect = String(option.id) === String(rubric.correct_option_id);
             return (
               <div
                 key={option.id}
                 className={`flex items-center gap-2 text-sm rounded-lg px-3 py-1.5 ${
-                  isCorrect
-                    ? "bg-green-50 text-green-800 font-medium"
-                    : "text-gray-600"
+                  isCorrect ? "bg-green-50 text-green-800 font-medium" : "text-gray-600"
                 }`}
               >
                 {isCorrect ? (
@@ -65,9 +65,7 @@ function AnswerKey({ question }) {
             );
           })}
           {rubric.explanation && (
-            <p className="text-xs text-gray-400 mt-1">
-              Explanation: {rubric.explanation}
-            </p>
+            <p className="text-xs text-gray-400 mt-1">Explanation: {rubric.explanation}</p>
           )}
         </div>
       );
@@ -76,9 +74,7 @@ function AnswerKey({ question }) {
       const answers = rubric.acceptable_answers || [];
       return (
         <div className="mt-2">
-          <p className="text-xs font-semibold text-gray-400 mb-1">
-            Accepted answers
-          </p>
+          <p className="text-xs font-semibold text-gray-400 mb-1">Accepted answers</p>
           <div className="flex flex-wrap gap-1.5">
             {answers.length ? (
               answers.map((answer, i) => (
@@ -90,27 +86,19 @@ function AnswerKey({ question }) {
                 </span>
               ))
             ) : (
-              <span className="text-xs text-gray-400">
-                No accepted answers saved.
-              </span>
+              <span className="text-xs text-gray-400">No accepted answers saved.</span>
             )}
           </div>
         </div>
       );
     }
     case "sentence_formation": {
-      const tokensById = new Map(
-        (payload.tokens || []).map((t) => [String(t.id), t.text]),
-      );
+      const tokensById = new Map((payload.tokens || []).map((t) => [String(t.id), t.text]));
       const expectedOrder = rubric.expected_order || [];
-      const sentence = expectedOrder
-        .map((id) => tokensById.get(String(id)) || "?")
-        .join(" ");
+      const sentence = expectedOrder.map((id) => tokensById.get(String(id)) || "?").join(" ");
       return (
         <div className="mt-2">
-          <p className="text-xs font-semibold text-gray-400 mb-1">
-            Correct order
-          </p>
+          <p className="text-xs font-semibold text-gray-400 mb-1">Correct order</p>
           <p className="text-sm font-medium bg-green-50 text-green-800 px-3 py-2 rounded-lg inline-block">
             {sentence || "(no answer saved)"}
           </p>
@@ -121,12 +109,8 @@ function AnswerKey({ question }) {
       const keywords = rubric.keywords || [];
       return (
         <div className="mt-2 text-xs text-gray-500 space-y-1">
-          {keywords.length > 0 && (
-            <p>Expected keywords: {keywords.join(", ")}</p>
-          )}
-          {rubric.min_word_count > 0 && (
-            <p>Minimum word count: {rubric.min_word_count}</p>
-          )}
+          {keywords.length > 0 && <p>Expected keywords: {keywords.join(", ")}</p>}
+          {rubric.min_word_count > 0 && <p>Minimum word count: {rubric.min_word_count}</p>}
         </div>
       );
     }
@@ -151,12 +135,10 @@ function ExerciseCard({ exercise, onDelete }) {
             <ClipboardList size={18} />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-gray-800 truncate">
-              {exercise.title}
-            </p>
+            <p className="font-semibold text-gray-800 truncate">{exercise.title}</p>
             <p className="text-sm text-gray-500">
-              {questions.length} question{questions.length === 1 ? "" : "s"} ·
-              Pass at {exercise.passing_percentage}%
+              {questions.length} question{questions.length === 1 ? "" : "s"} · Pass at{" "}
+              {exercise.passing_percentage}%
             </p>
           </div>
         </div>
@@ -196,8 +178,13 @@ function ExerciseCard({ exercise, onDelete }) {
 
           {questions.map((question, index) => {
             const isComprehension = question.question_type === "comprehension";
-            const contentPayload = ensureJson(question.content_payload) || {};
-            const subQuestions = contentPayload?.sub_questions || [];
+            // Normalize once per question — see parseJsonMaybe above.
+            // sub_questions come out already-parsed as part of this
+            // parse (JSON.parse handles the whole nested structure in
+            // one pass), so each sub's own content_payload/grading_rubric
+            // needs no separate parsing before reaching AnswerKey.
+            const payload = parseJsonMaybe(question.content_payload, {}) || {};
+            const subQuestions = payload.sub_questions || [];
             // Comprehension's real max is the sum of its sub-questions'
             // points (see getQuestionMaxPoints in
             // exerciseEvaluationService.js) — fall back to the stored
@@ -206,23 +193,15 @@ function ExerciseCard({ exercise, onDelete }) {
             // silently shows 0.
             const totalPoints = isComprehension
               ? subQuestions.length
-                ? subQuestions.reduce(
-                    (sum, sub) => sum + (Number(sub.points) || 1),
-                    0,
-                  )
+                ? subQuestions.reduce((sum, sub) => sum + (Number(sub.points) || 1), 0)
                 : question.points
               : question.points;
 
             return (
-              <div
-                key={question.id}
-                className="border border-gray-200 rounded-xl p-4 bg-white"
-              >
+              <div key={question.id} className="border border-gray-200 rounded-xl p-4 bg-white">
                 <div className="flex items-center justify-between mb-2 gap-2">
                   <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded-lg">
-                    Q{index + 1} ·{" "}
-                    {QUESTION_TYPE_LABELS[question.question_type] ||
-                      question.question_type}
+                    Q{index + 1} · {QUESTION_TYPE_LABELS[question.question_type] || question.question_type}
                   </span>
                   <span className="text-xs text-gray-400">
                     {totalPoints} point{totalPoints === 1 ? "" : "s"}
@@ -231,16 +210,14 @@ function ExerciseCard({ exercise, onDelete }) {
 
                 {isComprehension ? (
                   <div className="space-y-3">
-                    {payloadHasPassage(question) ? (
+                    {payload.passage_html ? (
                       <div className="border-l-4 border-indigo-300 bg-indigo-50/60 rounded-r-lg p-3">
                         <p className="text-xs font-semibold text-indigo-400 mb-1 uppercase tracking-wide">
                           Reading Passage
                         </p>
                         <div
                           className="text-sm text-gray-700 prose prose-sm max-w-none"
-                          dangerouslySetInnerHTML={{
-                            __html: contentPayload.passage_html,
-                          }}
+                          dangerouslySetInnerHTML={{ __html: payload.passage_html }}
                         />
                       </div>
                     ) : (
@@ -249,23 +226,17 @@ function ExerciseCard({ exercise, onDelete }) {
 
                     {subQuestions.length === 0 && (
                       <p className="text-xs text-amber-600">
-                        No sub-questions saved — this looks like a legacy
-                        comprehension question authored before the composite
-                        format. Re-author it in the builder.
+                        No sub-questions saved — this looks like a legacy comprehension question
+                        authored before the composite format. Re-author it in the builder.
                       </p>
                     )}
 
                     <div className="space-y-2">
                       {subQuestions.map((sub, subIndex) => (
-                        <div
-                          key={sub.id}
-                          className="border border-gray-100 rounded-lg p-3"
-                        >
+                        <div key={sub.id} className="border border-gray-100 rounded-lg p-3">
                           <p className="text-xs font-semibold text-gray-400 mb-1">
-                            {subIndex + 1}.{" "}
-                            {QUESTION_TYPE_LABELS[sub.question_type] ||
-                              sub.question_type}{" "}
-                            · {sub.points} point{sub.points === 1 ? "" : "s"}
+                            {subIndex + 1}. {QUESTION_TYPE_LABELS[sub.question_type] || sub.question_type} ·{" "}
+                            {sub.points} point{sub.points === 1 ? "" : "s"}
                           </p>
                           <div
                             className="text-sm text-gray-700 prose prose-sm max-w-none"
@@ -292,10 +263,6 @@ function ExerciseCard({ exercise, onDelete }) {
       )}
     </div>
   );
-}
-
-function payloadHasPassage(question) {
-  return Boolean(ensureJson(question.content_payload)?.passage_html);
 }
 
 export default ExerciseCard;
