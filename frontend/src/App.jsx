@@ -26,6 +26,7 @@ import LessonPracticePlayer from "./pages/mentee/LessonPracticePlayer";
 import PracticePlayerPage from "./pages/mentee/PracticePlayerPage";
 import PronunciationLoadingPage from "./pages/mentee/PronunciationLoadingPage";
 import PracticeCompletePage from "./pages/mentee/PracticeCompletePage";
+import AssessmentPlayerPage from "./features/exercises/AssessmentPlayerPage";
 import { ROUTES } from "./constants/routes";
 import RootRedirect from "./routes/RootRedirect";
 
@@ -185,6 +186,14 @@ function App() {
           element={
             <ProtectedRoute roles={["mentee"]}>
               <PracticeCompletePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={`${ROUTES.MENTEE_PRACTICE}/:lessonId/assessment/:exerciseId`}
+          element={
+            <ProtectedRoute roles={["mentee"]}>
+              <AssessmentPlayerPage />
             </ProtectedRoute>
           }
         />

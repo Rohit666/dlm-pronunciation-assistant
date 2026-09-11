@@ -121,4 +121,9 @@ module.exports = {
   BLOCK_TYPES,
   normalizeContentBlocks,
   deriveLegacyColumns,
+  // Generic rich-text sanitizer, not sentence-specific despite living
+  // here — reused by exerciseController.js for exercise_questions.prompt,
+  // which is the same "mentor-authored HTML rendered to other users via
+  // dangerouslySetInnerHTML" hazard this was built for.
+  sanitizeBlockText,
 };

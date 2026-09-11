@@ -19,21 +19,43 @@ import {
   getActiveAttempt,
 } from "../../services/practiceAttemptService";
 import PrimaryButton from "../../components/common/PrimaryButton";
+import ExerciseListSection from "../../features/exercises/ExerciseListSection";
+import {
+  getCourseResume,
+  updateCourseProgress,
+  startCourseRun,
+} from "../../services/courseStreamService";
 function LessonPracticePage() {
   const { lessonId } = useParams();
   const [sentences, setSentences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lesson, setLesson] = useState(null);
   const [activeAttempt, setActiveAttempt] = useState(null);
+  // Resume pointer — resolved server-side to the FIRST incomplete item
+  // in the course stream (see getCourseResume/getResumeItem), not the
+  // raw "last touched" pointer. Only set when that resolved item is an
+  // assessment; a resolved content item still routes to the sentence
+  // flow below (activeAttempt/handleStartPractice) — the sentence
+  // runner has no per-sentence deep link yet (same architectural limit
+  // already documented on AssessmentPlayerPage's goToNextStreamItem),
+  // so "resume to a specific sentence" means "resume/start this
+  // lesson's attempt", which is exactly what that flow already does.
+  const [resumeAssessmentId, setResumeAssessmentId] = useState(null);
+  // status === "completed" from getCourseResume/getResumeItem: every
+  // step in the course stream is done. The primary action becomes
+  // "Practice Again", starting a brand-new attempt from step 0 rather
+  // than resuming anything.
+  const [courseCompleted, setCourseCompleted] = useState(false);
   const navigate = useNavigate();
 
   const fetchData = async () => {
     try {
-      const [lessonResponse, sentenceResponse, attemptResponse] =
+      const [lessonResponse, sentenceResponse, attemptResponse, resumeResponse] =
         await Promise.all([
           api.get(`/lessons/${lessonId}`),
           api.get(`/lesson-sentences/${lessonId}`),
           getActiveAttempt(lessonId),
+          getCourseResume(lessonId).catch(() => null),
         ]);
 
       setLesson(lessonResponse.data.lesson);
@@ -41,6 +63,37 @@ function LessonPracticePage() {
       setSentences(sentenceResponse.data.sentences);
 
       setActiveAttempt(attemptResponse.attempt);
+
+      // Bug fix: this used to trust mentee_course_progress's raw
+      // "last touched" pointer, so opening the Assessment before
+      // finishing an earlier sentence made Resume Practice skip
+      // straight to it. getCourseResume resolves the first incomplete
+      // stream item server-side — only route to the assessment when
+      // that resolved item genuinely is one.
+      //
+      // Second bug fix, on top: a resolved "completed"/"incomplete"
+      // read off assessments.is_accepted can be stale relative to an
+      // OPEN retry — is_accepted reflects each sentence's best-ever
+      // accepted score across every attempt, past or present, and
+      // stays true even while a later attempt is mid-way back through
+      // the same sentences. status === "attempt_in_progress" is the
+      // resolver's own signal that a live PracticeAttempt takes
+      // priority over that historical read; activeAttempt (fetched
+      // above, straight off practice_attempts) is the correct resume
+      // target there, and the existing activeAttempt branch below
+      // already handles it.
+      //
+      // Third: status === "incomplete" is the ONLY case where `item`
+      // is genuinely "the next thing to do" — an allow-list, not a
+      // negative exclusion, so "completed" (where `item` is just a
+      // Review Course landing point, stream[0], not a target to route
+      // into) can never accidentally set this even if that first step
+      // happens to be an assessment.
+      if (resumeResponse?.status === "incomplete" && resumeResponse.item?.item_type === "assessment") {
+        setResumeAssessmentId(resumeResponse.item.id);
+      }
+
+      setCourseCompleted(resumeResponse?.status === "completed");
     } catch (error) {
       console.error(error);
 
@@ -56,6 +109,12 @@ function LessonPracticePage() {
   const handleStartPractice = async () => {
     try {
       const response = await startPracticeAttempt(lessonId);
+      if (sentences.length) {
+        // Best-effort resume pointer for the content half of the course
+        // stream — see the delivery notes for why this is lesson-block
+        // granularity today, not per-sentence.
+        updateCourseProgress(lessonId, "content", sentences[0].id).catch(() => {});
+      }
       navigate(
         `${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${response.attemptId}`,
       );
@@ -63,6 +122,55 @@ function LessonPracticePage() {
       console.error(error);
     }
   };
+
+  // Course Run lifecycle — "Practice Again" is NOT just "start a new
+  // attempt" the way first-time "Start Practice" is. Without an
+  // explicit new run, old exercise/sentence submissions from the run
+  // that just completed would keep satisfying THIS pass's progression
+  // checks forever (the actual bug this fixes — see
+  // courseStreamService.getResumeItem/activityRegistry), so this closes
+  // that run as abandoned and opens a fresh one at step 0 BEFORE
+  // creating the new practice attempt that binds to it.
+  const handlePracticeAgain = async () => {
+    try {
+      await startCourseRun(lessonId);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to start a new practice run");
+      return;
+    }
+    await handleStartPractice();
+  };
+
+  const handleResumeOrStart = () => {
+    // Checked first: once the course is fully completed there is
+    // nothing to resume into.
+    if (courseCompleted) {
+      handlePracticeAgain();
+      return;
+    }
+    // Defense in depth, on top of the fetchData guard above: a live
+    // activeAttempt (straight off practice_attempts.status =
+    // 'in_progress') always wins over resumeAssessmentId. It should
+    // never be set at the same time as an active attempt now, but if
+    // it ever is, an open attempt is ground truth for "the mentee is
+    // still mid-lesson" and must not be skipped past.
+    if (activeAttempt) {
+      navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${activeAttempt.id}`);
+      return;
+    }
+    if (resumeAssessmentId) {
+      navigate(ROUTES.assessmentPlayer(lessonId, resumeAssessmentId));
+      return;
+    }
+    handleStartPractice();
+  };
+
+  const primaryButtonLabel = courseCompleted
+    ? "Practice Again"
+    : resumeAssessmentId || activeAttempt
+      ? "Resume Practice"
+      : "Start Practice";
   return (
     <DashboardLayout>
       <PageHeader
@@ -73,18 +181,8 @@ function LessonPracticePage() {
         <button onClick={() => navigate(ROUTES.MENTEE_LESSONS)} className="...">
           ← Back to Lessons
         </button>
-        <PrimaryButton
-          onClick={() => {
-            if (activeAttempt) {
-              navigate(
-                `${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${activeAttempt.id}`,
-              );
-            } else {
-              handleStartPractice();
-            }
-          }}
-        >
-          {activeAttempt ? "Resume Practice" : "Start Practice"}
+        <PrimaryButton onClick={handleResumeOrStart}>
+          {primaryButtonLabel}
         </PrimaryButton>
       </div>
       <div className="bg-white rounded-3xl shadow-sm p-6 mb-8">
@@ -118,6 +216,9 @@ function LessonPracticePage() {
           </div>
         </div>
       </div>
+
+      <ExerciseListSection lessonId={lessonId} />
+
       {loading ? (
         <div className="bg-white rounded-3xl shadow-sm">
           <Loader text="Loading lesson content..." />
@@ -221,18 +322,8 @@ function LessonPracticePage() {
             >
               Start Practice
             </button> */}
-            <PrimaryButton
-              onClick={() => {
-                if (activeAttempt) {
-                  navigate(
-                    `${ROUTES.MENTEE_PRACTICE}/${lessonId}/player/${activeAttempt.id}`,
-                  );
-                } else {
-                  handleStartPractice();
-                }
-              }}
-            >
-              {activeAttempt ? "Resume Practice" : "Start Practice"}
+            <PrimaryButton onClick={handleResumeOrStart}>
+              {primaryButtonLabel}
             </PrimaryButton>
           </div>
         </div>

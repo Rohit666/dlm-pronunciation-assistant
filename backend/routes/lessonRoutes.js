@@ -3,6 +3,9 @@ const express = require("express");
 const router = express.Router();
 
 const lessonController = require("../controllers/lessonController");
+const exerciseController = require("../controllers/exerciseController");
+const topicController = require("../controllers/topicController");
+const courseStreamController = require("../controllers/courseStreamController");
 
 const { verifyToken } = require("../middleware/authMiddleware");
 
@@ -20,6 +23,49 @@ router.post(
   lessonController.createLesson,
 );
 router.get("/:id", verifyToken, lessonController.getLessonById);
+
+// Milestone 9 — GET /api/lessons/:lessonId/exercises. Separate segment
+// count from "/:id" above, no route collision.
+router.get(
+  "/:lessonId/exercises",
+  verifyToken,
+  exerciseController.getLessonExercises,
+);
+
+// Hierarchical Content Tree — read side. Tree powers the mentor Tree
+// Explorer; stream/progress power the mentee unified sequential player.
+router.get("/:lessonId/tree", verifyToken, topicController.getCourseTree);
+router.get("/:lessonId/stream", verifyToken, courseStreamController.getStream);
+router.get(
+  "/:lessonId/progress",
+  verifyToken,
+  allowRoles("mentee"),
+  courseStreamController.getProgress,
+);
+router.post(
+  "/:lessonId/progress",
+  verifyToken,
+  allowRoles("mentee"),
+  courseStreamController.updateProgress,
+);
+// Resolved resume target — first incomplete stream item, not the raw
+// last-touched pointer /progress above returns.
+router.get(
+  "/:lessonId/resume",
+  verifyToken,
+  allowRoles("mentee"),
+  courseStreamController.getResumeTarget,
+);
+// Course Run lifecycle — "Practice Again" starts an explicit fresh run
+// (closes any dangling in_progress run as abandoned) rather than
+// relying on incidental find-or-create semantics elsewhere.
+router.post(
+  "/:lessonId/start-run",
+  verifyToken,
+  allowRoles("mentee"),
+  courseStreamController.startRun,
+);
+
 router.put(
   "/:id",
   verifyToken,

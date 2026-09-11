@@ -47,6 +47,13 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.JSON,
         allowNull: true,
       },
+
+      // Hierarchical Content Tree — NULL means this content sits at the
+      // course root; non-null places it inside that topic/sub-topic.
+      topic_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
     },
     {
       tableName: "lesson_sentences",
@@ -58,6 +65,9 @@ module.exports = (sequelize, DataTypes) => {
   LessonSentence.associate = (models) => {
     LessonSentence.belongsTo(models.Lesson, {
       foreignKey: "lesson_id",
+    });
+    LessonSentence.belongsTo(models.Topic, {
+      foreignKey: "topic_id",
     });
     LessonSentence.hasMany(models.PracticeSession, {
       foreignKey: "lesson_sentence_id",

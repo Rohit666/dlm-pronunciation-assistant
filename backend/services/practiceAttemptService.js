@@ -38,10 +38,26 @@ const getOrCreatePracticeAttempt = async (menteeId, lessonId) => {
     order: [["id", "DESC"]],
   });
   const attemptNumber = lastAttempt ? lastAttempt.attempt_number + 1 : 1;
+
+  // Course Run lifecycle — bind this new attempt to whatever run is
+  // currently active (finds an in_progress one, or mints a fresh one).
+  // "Practice Again" on LessonPracticePage.jsx calls
+  // progressionService.startNewRun BEFORE reaching here (via POST
+  // /lessons/:lessonId/start-run — see courseStreamController.startRun),
+  // so by the time this runs there's a guaranteed-fresh run to attach
+  // to. This is what makes run-scoped completion in
+  // courseStreamService.getResumeItem/activityRegistry actually work:
+  // without a course_run_id, a new attempt could never satisfy any
+  // run-scoped isCompleted check, and old attempts from a prior run
+  // would keep counting toward this one forever — the exact bug this
+  // delivery fixes.
+  const activeRun = await progressionService.getOrCreateActiveRun(lessonId, menteeId);
+
   attempt = await PracticeAttempt.create({
     mentee_id: menteeId,
     lesson_id: lessonId,
     attempt_number: attemptNumber,
+    course_run_id: activeRun.id,
   });
 
   return {

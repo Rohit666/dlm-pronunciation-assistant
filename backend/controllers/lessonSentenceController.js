@@ -84,7 +84,7 @@ function parseContentBlocksField(rawValue) {
 exports.createSentence = async (req, res) => {
   try {
     const { lessonId } = req.params;
-    const { sentence_order } = req.body;
+    const { sentence_order, topic_id } = req.body;
 
     const rawBlocks = parseContentBlocksField(req.body.content_blocks);
 
@@ -101,6 +101,8 @@ exports.createSentence = async (req, res) => {
 
     const sentence = await LessonSentence.create({
       lesson_id: lessonId,
+      // Hierarchical Content Tree — omitted/empty means course root.
+      topic_id: topic_id || null,
       sentence_order,
       content_blocks: contentBlocks,
       ...legacyColumns,

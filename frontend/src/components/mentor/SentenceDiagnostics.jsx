@@ -127,25 +127,39 @@ function SentenceDiagnostics({ assessment }) {
           <div className="space-y-2">
             {(expandedWord.phonemes || [])
               .filter((phoneme) => phoneme.operation !== "exact_match")
-              .map((phoneme) => (
-                <div
-                  key={phoneme.id}
-                  className="flex items-center gap-3 text-sm bg-white rounded-lg px-3 py-2 border border-gray-200"
-                >
-                  <span className="font-mono text-red-700">
-                    /{phoneme.expected_symbol || "—"}/
-                  </span>
-                  <span className="text-gray-400">→</span>
-                  <span className="font-mono text-gray-800">
-                    /{phoneme.detected_symbol || "—"}/
-                  </span>
-                  <span className="ml-auto text-xs text-gray-500">
-                    similarity {phoneme.similarity !== null && phoneme.similarity !== undefined
-                      ? Number(phoneme.similarity).toFixed(2)
-                      : "—"}
-                  </span>
-                </div>
-              ))}
+              .map((phoneme) => {
+                const style = WORD_STYLES[phoneme.operation] || WORD_STYLES.substitution;
+                const changedFeatures = phoneme.changed_features || [];
+                return (
+                  <div
+                    key={phoneme.id}
+                    className="flex items-center gap-3 text-sm bg-white rounded-lg px-3 py-2 border border-gray-200"
+                  >
+                    <span className="font-mono text-red-700">
+                      /{phoneme.expected_symbol || "—"}/
+                    </span>
+                    <span className="text-gray-400">→</span>
+                    <span className="font-mono text-gray-800">
+                      /{phoneme.detected_symbol || "—"}/
+                    </span>
+                    {/* Discrete evidence only — no synthetic similarity
+                        score persisted at the phoneme row level. The
+                        comparison engine's actual output is this
+                        operation plus, for a substitution, which
+                        phonetic features changed. */}
+                    <span
+                      className={`ml-auto px-2 py-0.5 rounded-md text-xs font-medium ${style.className}`}
+                    >
+                      {style.label}
+                    </span>
+                    {changedFeatures.length > 0 && (
+                      <span className="text-xs text-gray-500">
+                        {changedFeatures.join(", ")}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}

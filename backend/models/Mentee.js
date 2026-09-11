@@ -58,6 +58,12 @@ module.exports = (sequelize, DataTypes) => {
     Mentee.hasMany(models.MenteeCefrMilestone, {
       foreignKey: "mentee_id",
     });
+    Mentee.hasMany(models.ExerciseAttempt, {
+      foreignKey: "mentee_id",
+    });
+    Mentee.hasMany(models.MenteeCourseProgress, {
+      foreignKey: "mentee_id",
+    });
   };
 
   return Mentee;

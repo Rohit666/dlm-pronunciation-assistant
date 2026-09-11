@@ -1,131 +1,86 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import PageHeader from "../../components/PageHeader";
-import PrimaryButton from "../../components/common/PrimaryButton";
-import SecondaryButton from "../../components/common/SecondaryButton";
-import { getPracticeAttempt } from "../../services/practiceAttemptService";
+import Loader from "../../components/Loader";
+import { getCourseResume } from "../../services/courseStreamService";
 import { ROUTES } from "../../constants/routes";
+import CourseCompletedScreen from "../../features/exercises/CourseCompletedScreen";
 
-// Self-paced (Requirement 1.1): completion no longer waits on mentor
-// review. `attempt.status === "submitted"` means the computed
-// overall_score already cleared the pass threshold and CEFR progress
-// already advanced server-side — mentor review, if any, arrives later
-// as optional formative feedback and is never what unblocks this
-// screen.
-const PASS_THRESHOLD = 70;
-
+// ---------------------------------------------------------------------
+// Unified stream — this is now the FINAL-ACTIVITY landing spot ONLY,
+// never an intermediate "Lesson Complete!" stop.
+//
+// PracticePlayerProvider.submitRecording already re-resolves against
+// getResumeItem (via getCourseResume) the moment the mentee submits the
+// last sentence of a content attempt, and routes straight to the next
+// stream activity's own URL when one remains — this page is only ever
+// reached when that resolution said `status: "completed"`, or as its
+// own error fallback.
+//
+// So this page re-verifies the exact same way on mount rather than
+// trusting it was routed here correctly: a stale bookmark, browser
+// back/forward, or that error fallback could land a mentee here while
+// the course genuinely still has steps left. In that case it forwards
+// straight to `resume.item.route` (the same activityRegistry-resolved
+// URL every other seam in this stream consumes) instead of showing any
+// intermediate card — there is exactly one completion screen in this
+// whole flow, and it lives here, gated purely on the stream's own
+// `status: "completed"`, not on this one attempt's individual pass/fail
+// (a content step counts as done per-sentence via `assessments.
+// is_accepted`, independent of whether the whole attempt cleared the
+// pass threshold — see courseStreamService.getResumeItem).
+// ---------------------------------------------------------------------
 function PracticeCompletePage() {
   const navigate = useNavigate();
-  const { lessonId, attemptId } = useParams();
-  const [attempt, setAttempt] = useState(null);
+  const { lessonId } = useParams();
+  const [stats, setStats] = useState(null);
+  const [resolving, setResolving] = useState(true);
+
   useEffect(() => {
-    loadAttempt();
-  }, []);
-  const loadAttempt = async () => {
-    try {
-      const response = await getPracticeAttempt(attemptId);
+    (async () => {
+      try {
+        const resume = await getCourseResume(lessonId);
+        if (resume?.status === "completed") {
+          setStats(resume.stats || null);
+          setResolving(false);
+          return;
+        }
+        if (resume?.item?.route) {
+          navigate(resume.item.route, { replace: true });
+          return;
+        }
+        // No resolvable target (e.g. an empty/deleted course) — the
+        // lesson overview is the only safe place left to send them.
+        navigate(`${ROUTES.MENTEE_LESSONS}/${lessonId}`, { replace: true });
+      } catch (error) {
+        console.error(error);
+        navigate(`${ROUTES.MENTEE_LESSONS}/${lessonId}`, { replace: true });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonId]);
 
-      setAttempt(response.attempt);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const passed = attempt?.status === "submitted";
-  const score =
-    attempt?.overall_score !== null && attempt?.overall_score !== undefined
-      ? Number(attempt.overall_score)
-      : null;
+  if (resolving) {
+    return (
+      <DashboardLayout>
+        <Loader text="Checking your progress..." />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
-      <div
-        className="
-          max-w-3xl
-          mx-auto
-          mt-10
-        "
-      >
-        <div
-          className="
-            bg-white
-            rounded-3xl
-            shadow-sm
-            p-12
-            text-center
-          "
-        >
-          <div className="text-7xl">{passed ? "🎉" : "💪"}</div>
-
-          <h1
-            className="
-              text-4xl
-              font-bold
-              mt-6
-            "
-          >
-            {passed ? "Lesson Complete!" : "Almost There"}
-          </h1>
-
-          <p
-            className="
-              text-gray-500
-              mt-3
-            "
-          >
-            {passed
-              ? "Great work! Your progress has been saved automatically."
-              : `Score below ${PASS_THRESHOLD}% — keep practicing this lesson to unlock the next level.`}
-          </p>
-
-          <div
-            className="
-              mt-10
-              space-y-3
-            "
-          >
-            <div>
-              <strong>Lesson:</strong> {attempt?.Lesson?.title}
-            </div>
-
-            <div>
-              <strong>Attempt:</strong> #{attempt?.attempt_number}
-            </div>
-
-            {score !== null && (
-              <div>
-                <strong>Overall Score:</strong> {score}%
-              </div>
-            )}
-
-            <div>
-              <strong>Status:</strong>{" "}
-              {passed ? "Submitted — CEFR progress updated" : "In Progress"}
-            </div>
-          </div>
-
-          <div
-            className="
-              flex
-              justify-center
-              gap-4
-              mt-10
-            "
-          >
-            <SecondaryButton onClick={() => navigate(ROUTES.MENTEE_LESSONS)}>
-              Back To Lessons
-            </SecondaryButton>
-
-            <PrimaryButton
-              onClick={() => navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}`)}
-            >
-              Practice Again
-            </PrimaryButton>
-          </div>
+      <div className="max-w-3xl mx-auto mt-10">
+        <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+          <CourseCompletedScreen
+            stats={stats}
+            onBackToLessons={() => navigate(ROUTES.MENTEE_LESSONS)}
+            onReviewCourse={() => navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}`)}
+          />
         </div>
       </div>
     </DashboardLayout>
   );
 }
+
 export default PracticeCompletePage;
