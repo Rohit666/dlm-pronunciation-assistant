@@ -20,6 +20,21 @@ import QUESTION_TYPES from "../../constants/exerciseQuestionTypes";
 // so mysql2 never auto-parses it there). Belt-and-suspenders on top of
 // that for contentPayload/gradingRubric/studentAnswer, wherever they
 // enter this file.
+// Score/points sums are floating-point additions of DECIMAL(5,2) DB
+// values (grading loops add per-question scoreAwarded in JS) — raw
+// display showed things like "8.969999999999999 / 12 points". Rounds to
+// 2 decimals and trims a trailing ".00"/".x0" so a whole number reads
+// as "9", not "9.00".
+export function formatPoints(value) {
+  const rounded = Math.round((Number(value) || 0) * 100) / 100;
+  // parseFloat(rounded.toFixed(2)) round-trips through a fixed-2-decimal
+  // string and back to a number, which drops any trailing zero
+  // (8.90 -> 8.9, 9.00 -> 9) — String() on the plain rounded float alone
+  // isn't enough since binary float division (Math.round(x*100)/100)
+  // still produces values like 8.970000000000001 for some inputs.
+  return String(parseFloat(rounded.toFixed(2)));
+}
+
 export function safeParse(value, fallback) {
   if (value === null || value === undefined) return fallback;
   if (typeof value !== "string") return value;
@@ -126,7 +141,7 @@ function ComprehensionAnswerSheet({ entry }) {
               )}
               {sub.feedback && <p className="text-gray-500 mt-1">{sub.feedback}</p>}
               <p className="text-xs text-gray-400 mt-1">
-                {sub.scoreAwarded} / {sub.points} point{sub.points === 1 ? "" : "s"}
+                {formatPoints(sub.scoreAwarded)} / {formatPoints(sub.points)} point{sub.points === 1 ? "" : "s"}
               </p>
             </div>
           </div>
@@ -184,7 +199,7 @@ export function AnswerSheetRow({ entry, index }) {
           )}
           {entry.feedback && <p className="text-sm text-gray-500 mt-1">{entry.feedback}</p>}
           <p className="text-xs text-gray-400 mt-1">
-            {entry.scoreAwarded} / {entry.points} point{entry.points === 1 ? "" : "s"} awarded
+            {formatPoints(entry.scoreAwarded)} / {formatPoints(entry.points)} point{entry.points === 1 ? "" : "s"} awarded
           </p>
         </div>
         {expanded ? <ChevronUp size={18} className="shrink-0" /> : <ChevronDown size={18} className="shrink-0" />}
@@ -220,7 +235,7 @@ function ReportCard({ attempt, answerSheet, heading = "Diagnostic Report Card", 
           {attempt.passed ? "Passed" : "Not Passed Yet"}
         </p>
         <p className="text-sm text-gray-500 mt-1">
-          {attempt.totalScore} / {attempt.maxScore} points · Attempt #{attempt.attemptNumber} · Passing
+          {formatPoints(attempt.totalScore)} / {formatPoints(attempt.maxScore)} points · Attempt #{attempt.attemptNumber} · Passing
           score {attempt.passingPercentage}%
         </p>
       </div>

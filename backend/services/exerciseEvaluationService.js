@@ -489,6 +489,20 @@ async function submitExerciseAttempt({ exerciseId, menteeId, answers }) {
       });
     }
 
+    // Bug fix: totalScore/maxScore accumulate via += across the loop
+    // above (binary floating-point addition of DECIMAL(5,2) values,
+    // e.g. individual scoreAwarded amounts like 2.99 + 2.99 + 2.99 + 0.02
+    // sums to 8.969999999999999 in JS) — this raw sum was going straight
+    // into the DB write and the live response below, unrounded, so the
+    // report card showed it immediately after submit ("8.969999999999999
+    // / 12 points"), before it ever passed through the DECIMAL(5,2)
+    // column's own storage rounding a later re-fetch would have applied.
+    // Rounded here, once, right after the loop — every downstream use
+    // (percentage, the DB write, the live response) reads the clamped
+    // value.
+    totalScore = Math.round(totalScore * 100) / 100;
+    maxScore = Math.round(maxScore * 100) / 100;
+
     const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 10000) / 100 : 0;
     const passed = percentage >= Number(exercise.passing_percentage);
 
