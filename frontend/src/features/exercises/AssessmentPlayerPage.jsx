@@ -322,6 +322,16 @@ function AssessmentPlayerPage() {
       navigate(`${ROUTES.MENTEE_LESSONS}/${lessonId}`);
       return;
     }
+    // Activity Provider Registry — the backend stream now carries a
+    // `route` per step (activityRegistry[item_type].getRoute), so a
+    // future activity type (toefl_ibt, ...) needs no change here. Falls
+    // back to the item_type switch only for a stream response fetched
+    // before this field existed (a stale cached response, not expected
+    // in normal use).
+    if (nextStreamItem.route) {
+      navigate(nextStreamItem.route);
+      return;
+    }
     if (nextStreamItem.item_type === "assessment") {
       navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}/assessment/${nextStreamItem.id}`);
     } else {

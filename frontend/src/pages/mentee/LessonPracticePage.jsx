@@ -23,6 +23,7 @@ import ExerciseListSection from "../../features/exercises/ExerciseListSection";
 import {
   getCourseResume,
   updateCourseProgress,
+  startCourseRun,
 } from "../../services/courseStreamService";
 function LessonPracticePage() {
   const { lessonId } = useParams();
@@ -122,15 +123,30 @@ function LessonPracticePage() {
     }
   };
 
+  // Course Run lifecycle — "Practice Again" is NOT just "start a new
+  // attempt" the way first-time "Start Practice" is. Without an
+  // explicit new run, old exercise/sentence submissions from the run
+  // that just completed would keep satisfying THIS pass's progression
+  // checks forever (the actual bug this fixes — see
+  // courseStreamService.getResumeItem/activityRegistry), so this closes
+  // that run as abandoned and opens a fresh one at step 0 BEFORE
+  // creating the new practice attempt that binds to it.
+  const handlePracticeAgain = async () => {
+    try {
+      await startCourseRun(lessonId);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to start a new practice run");
+      return;
+    }
+    await handleStartPractice();
+  };
+
   const handleResumeOrStart = () => {
     // Checked first: once the course is fully completed there is
-    // nothing to resume into — "Practice Again" always starts a fresh
-    // attempt from step 0 (handleStartPractice already does exactly
-    // that: no in_progress PracticeAttempt exists once completed, so
-    // getOrCreatePracticeAttempt server-side mints a new attempt_number
-    // rather than resuming an old one).
+    // nothing to resume into.
     if (courseCompleted) {
-      handleStartPractice();
+      handlePracticeAgain();
       return;
     }
     // Defense in depth, on top of the fetchData guard above: a live

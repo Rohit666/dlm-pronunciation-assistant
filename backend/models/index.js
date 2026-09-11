@@ -58,6 +58,7 @@ db.MenteeCourseProgress = require("./MenteeCourseProgress")(
   sequelize,
   Sequelize.DataTypes,
 );
+db.CourseRun = require("./CourseRun")(sequelize, Sequelize.DataTypes);
 // Run associations
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {

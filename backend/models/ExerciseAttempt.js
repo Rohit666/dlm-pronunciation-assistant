@@ -6,6 +6,9 @@ module.exports = (sequelize, DataTypes) => {
 
       exercise_id: { type: DataTypes.INTEGER, allowNull: false },
       mentee_id: { type: DataTypes.INTEGER, allowNull: false },
+      // Course Run lifecycle — see PracticeAttempt.course_run_id for the
+      // same rationale. Nullable for the identical reason.
+      course_run_id: { type: DataTypes.INTEGER, allowNull: true },
       attempt_number: { type: DataTypes.INTEGER, allowNull: false },
       total_score: { type: DataTypes.DECIMAL(5, 2), allowNull: false },
       max_score: { type: DataTypes.DECIMAL(5, 2), allowNull: false },
@@ -26,6 +29,7 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "exercise_id",
     });
     ExerciseAttempt.belongsTo(models.Mentee, { foreignKey: "mentee_id" });
+    ExerciseAttempt.belongsTo(models.CourseRun, { foreignKey: "course_run_id" });
     ExerciseAttempt.hasMany(models.ExerciseAttemptAnswer, {
       foreignKey: "exercise_attempt_id",
       as: "answers",

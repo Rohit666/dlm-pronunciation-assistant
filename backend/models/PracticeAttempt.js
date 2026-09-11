@@ -11,19 +11,21 @@ module.exports = (sequelize, DataTypes) => {
       mentee_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: {
-          model: "mentees",
-          key: "id",
-        },
       },
 
       lesson_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: {
-          model: "lessons",
-          key: "id",
-        },
+      },
+
+      // Course Run lifecycle — which pass through the course this
+      // attempt belongs to. Nullable: pre-migration rows have none (see
+      // the migration's backfill), and the model itself works fine
+      // without one (progressionService.getOrCreateActiveRun stamps it
+      // going forward). null-safe everywhere it's read.
+      course_run_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
       },
 
       status: {
@@ -42,12 +44,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       overall_score: {
         type: DataTypes.DECIMAL(5, 2),
+        defaultValue: 0.0,
         allowNull: true,
       },
-      // DB column is TEXT, not varchar(255) — mentor feedback in
-      // ReviewAttemptPage.jsx is a multi-line textarea, easily over 255 chars.
       overall_feedback: {
-        type: DataTypes.TEXT,
+        type: DataTypes.STRING,
         allowNull: true,
       },
       review_status: {
@@ -57,10 +58,6 @@ module.exports = (sequelize, DataTypes) => {
       reviewed_by: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        references: {
-          model: "users",
-          key: "id",
-        },
       },
       reviewed_at: {
         type: DataTypes.DATE,
@@ -95,6 +92,10 @@ module.exports = (sequelize, DataTypes) => {
 
     PracticeAttempt.belongsTo(models.Lesson, {
       foreignKey: "lesson_id",
+    });
+
+    PracticeAttempt.belongsTo(models.CourseRun, {
+      foreignKey: "course_run_id",
     });
 
     PracticeAttempt.hasMany(models.PracticeSession, {

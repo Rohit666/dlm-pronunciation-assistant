@@ -4,6 +4,7 @@ const {
   locateInStream,
   getResumeItem,
 } = require("../services/courseStreamService");
+const progressionService = require("../services/progressionService");
 
 async function resolveMentee(userId) {
   return Mentee.findOne({ where: { user_id: userId } });
@@ -98,12 +99,47 @@ exports.getResumeTarget = async (req, res) => {
       status: resume.status,
       item: resume.item,
       is_finished: resume.is_finished,
-      // Present only for status === "attempt_in_progress" — see
-      // getResumeItem for why an open practice_attempts row overrides
-      // the stream-based completion read.
-      activeAttempt: resume.activeAttempt || null,
+      // The mentee's active CourseRun this resolution was scoped
+      // against — see courseStreamService.getResumeItem.
+      run_id: resume.run_id,
       // Present only for status === "completed".
       stats: resume.stats || null,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// POST /api/lessons/:lessonId/start-run — Course Run lifecycle. Called
+// on "Practice Again" (LessonPracticePage.jsx), never on a plain first-
+// time "Start Practice" (getOrCreateActiveRun already handles that case
+// implicitly, the first time an attempt/submission is made). Explicitly
+// closes any run this mentee left `in_progress` for this course as
+// `abandoned` and opens a fresh one at step 0 — see
+// progressionService.startNewRun for why this needs to be its own call
+// rather than relying on getOrCreateActiveRun's find-or-create: a
+// genuinely still-open run exists at this point (the button only reads
+// "Practice Again" once the PRIOR run finished), and this is the
+// explicit signal to stop treating it as active.
+exports.startRun = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+
+    const mentee = await resolveMentee(req.user.id);
+    if (!mentee) {
+      return res.status(404).json({ success: false, message: "Mentee not found" });
+    }
+
+    const run = await progressionService.startNewRun(lessonId, mentee.id);
+
+    res.status(201).json({
+      success: true,
+      run: {
+        id: run.id,
+        runNumber: run.run_number,
+        status: run.status,
+      },
     });
   } catch (error) {
     console.error(error);

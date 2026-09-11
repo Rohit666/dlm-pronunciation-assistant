@@ -8,9 +8,10 @@ const {
   ExerciseAttempt,
   PracticeAttempt,
 } = require("../models");
-const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses");
 const { parseJsonField } = require("../utils/jsonHelper");
 const { round2 } = require("../utils/numberUtils");
+const progressionService = require("./progressionService");
+const activityRegistry = require("./activityRegistry");
 
 const TITLE_MAX_LENGTH = 45;
 
@@ -132,6 +133,12 @@ async function getCoursePlayStream(courseId) {
         title: resolveContentTitle(content),
         topic_id: topicId,
         topic_path: path,
+        // Activity Provider Registry — single source of truth for how
+        // to route to a step, so a new activity type (toefl_ibt, ...)
+        // only needs its own registry entry, never a frontend switch
+        // statement update. See activityRegistry.content.getRoute for
+        // why this is the lesson overview, not a per-sentence link.
+        route: activityRegistry.content.getRoute(content, courseId),
       });
     }
     for (const assessment of assessmentsByTopic.get(key) || []) {
@@ -142,6 +149,7 @@ async function getCoursePlayStream(courseId) {
         title: assessment.title,
         topic_id: topicId,
         topic_path: path,
+        route: activityRegistry.assessment.getRoute(assessment, courseId),
       });
     }
     for (const child of childrenByParent.get(key) || []) {
@@ -170,107 +178,14 @@ function locateInStream(stream, itemType, itemId) {
   };
 }
 
-// ---------------------------------------------------------------------
-// Resume resolution.
-//
-// Bug fix #1: "Resume Practice" must land on the FIRST incomplete
-// stream item, not whatever the mentee happened to touch most recently.
-// mentee_course_progress.last_active_item only ever records "last
-// opened" — it was being read directly as the resume target, so opening
-// the Assessment (even without finishing it) overwrote the pointer and
-// Resume Practice kept sending the mentee back to it, skipping a still-
-// incomplete earlier sentence entirely.
-//
-// Bug fix #2, found via a real runtime state (practice_attempts row:
-// status='in_progress', current_sentence_order=2, attempt_number=9):
-// content-completion below is judged off assessments.is_accepted —
-// each sentence's BEST-EVER accepted score, across every attempt past
-// or present. That stays TRUE even while a later, still-open
-// PracticeAttempt (a full lesson retry — see practiceAttemptService
-// .getOrCreatePracticeAttempt, which starts a new attempt_number when
-// the mentee re-enters a lesson with no attempt currently in_progress)
-// is mid-way back through the same sentences again. So the stream-based
-// read isn't wrong about history, it's answering the wrong question
-// while a live attempt is open: a mentee sitting in_progress at
-// sentence_order 2 of attempt #9 must not be routed to the Assessment
-// just because attempt #8 already got sentence #2 accepted. An active
-// PracticeAttempt (practice_attempts.status = 'in_progress') is
-// therefore checked FIRST, authoritative over any historical
-// acceptance record, and short-circuits straight to that attempt's
-// current sentence — the stream-based first-incomplete-item scan below
-// only runs once there is no such live attempt (mentee hasn't started,
-// or a prior attempt fully wrapped with nothing left open).
-//
-// Completion rules (once no active attempt applies):
-//   content (sentence)    -> mentee has an accepted assessment
-//                            (assessments.is_accepted = TRUE, joined
-//                            through its practice_session) for that
-//                            lesson_sentence
-//   assessment (exercise) -> mentee has AT LEAST ONE exercise_attempts
-//                            row for that exercise (any outcome, not
-//                            just passed). Requiring a PASS here would
-//                            let a mentee who keeps failing get stuck
-//                            re-taking the same exercise forever with no
-//                            way to move the stream forward — one
-//                            genuine attempt satisfies progression; a
-//                            passing score is what retakes are for, not
-//                            what unblocks the next step.
-//
-// Returns null for a missing/empty course. Otherwise one of:
-//   { status: 'attempt_in_progress', item, activeAttempt: { id, attemptNumber, currentSentenceOrder }, is_finished: false }
-//   { status: 'incomplete', item, is_finished: false }         — first incomplete stream entry
-//   { status: 'completed', item, is_finished: true, stats }    — every
-//     step done. item is the first stream entry (a "Review Course"
-//     landing point — there's no single natural "next" item once
-//     nothing is left); stats is getCourseCompletionStats' summary,
-//     computed here without a second pass since the completion scan
-//     already has everything it needs.
-// ---------------------------------------------------------------------
-async function getResumeItem(courseId, menteeId) {
-  const stream = await getCoursePlayStream(courseId);
-  if (!stream || !stream.length) return null;
-
-  const activeAttempt = await PracticeAttempt.findOne({
-    where: {
-      mentee_id: menteeId,
-      lesson_id: courseId,
-      status: PRACTICE_ATTEMPT_STATUSES.IN_PROGRESS,
-    },
-    order: [["created_at", "DESC"]],
-  });
-
-  if (activeAttempt) {
-    const currentSentence = await LessonSentence.findOne({
-      where: { lesson_id: courseId, sentence_order: activeAttempt.current_sentence_order },
-    });
-
-    // Best-effort mapping onto the stream's { item_type, id } shape so
-    // this response stays consistent with the other statuses below —
-    // falls back to the first content entry when current_sentence_order
-    // points past the end of the stream (e.g. the attempt is sitting on
-    // the last sentence, awaiting its /complete call) or the sentence
-    // was deleted since the attempt started.
-    const item =
-      (currentSentence && stream.find((entry) => entry.item_type === "content" && entry.id === currentSentence.id)) ||
-      stream.find((entry) => entry.item_type === "content") ||
-      stream[0];
-
-    return {
-      status: "attempt_in_progress",
-      item,
-      is_finished: false,
-      activeAttempt: {
-        id: activeAttempt.id,
-        attemptNumber: activeAttempt.attempt_number,
-        currentSentenceOrder: activeAttempt.current_sentence_order,
-      },
-    };
-  }
-
+// Run-scoped completion stats for a fully-completed run — same
+// "pooled mean of accepted-sentence accuracy + each exercise's best
+// percentage" judgment call as before, now scoped to THIS run's
+// attempts only rather than all-time history, since stats describe
+// "how did this pass go", not "how has this mentee ever done".
+async function computeRunStats(stream, menteeId, activeRun) {
   const contentIds = stream.filter((entry) => entry.item_type === "content").map((entry) => entry.id);
-  const assessmentIds = stream
-    .filter((entry) => entry.item_type === "assessment")
-    .map((entry) => entry.id);
+  const assessmentIds = stream.filter((entry) => entry.item_type === "assessment").map((entry) => entry.id);
 
   const [acceptedAssessments, exerciseAttempts] = await Promise.all([
     contentIds.length
@@ -281,13 +196,14 @@ async function getResumeItem(courseId, menteeId) {
               model: PracticeSession,
               required: true,
               where: { mentee_id: menteeId, lesson_sentence_id: contentIds },
+              include: [{ model: PracticeAttempt, required: true, where: { course_run_id: activeRun.id } }],
             },
           ],
         })
       : [],
     assessmentIds.length
       ? ExerciseAttempt.findAll({
-          where: { mentee_id: menteeId, exercise_id: assessmentIds },
+          where: { mentee_id: menteeId, exercise_id: assessmentIds, course_run_id: activeRun.id },
         })
       : [],
   ]);
@@ -295,27 +211,7 @@ async function getResumeItem(courseId, menteeId) {
   const completedContentIds = new Set(
     acceptedAssessments.map((assessment) => assessment.PracticeSession.lesson_sentence_id),
   );
-  const completedAssessmentIds = new Set(exerciseAttempts.map((attempt) => attempt.exercise_id));
 
-  const isComplete = (entry) =>
-    entry.item_type === "content"
-      ? completedContentIds.has(entry.id)
-      : completedAssessmentIds.has(entry.id);
-
-  const firstIncomplete = stream.find((entry) => !isComplete(entry));
-  if (firstIncomplete) {
-    return { status: "incomplete", item: firstIncomplete, is_finished: false };
-  }
-
-  // Every step complete. Judgment call, disclosed: "overall average
-  // score" isn't defined precisely in the spec, so it's the mean of two
-  // 0-100 quantities pooled together — each accepted sentence's
-  // overall_accuracy, and each attempted exercise's BEST percentage
-  // across its attempts (so a passed retake counts at its improved
-  // score, not its first failing one). null, not 0, when there's
-  // nothing to average (a course with steps but no scorable outcome
-  // yet, which shouldn't happen once every step is complete, but stays
-  // honest rather than reporting a fake 0 if it ever does).
   const bestPercentageByExercise = new Map();
   for (const attempt of exerciseAttempts) {
     const current = bestPercentageByExercise.get(attempt.exercise_id);
@@ -333,16 +229,80 @@ async function getResumeItem(courseId, menteeId) {
     : null;
 
   return {
+    totalContents: contentIds.length,
+    completedContents: completedContentIds.size,
+    totalAssessments: assessmentIds.length,
+    assessmentsTaken: bestPercentageByExercise.size,
+    overallAverageScore,
+  };
+}
+
+// ---------------------------------------------------------------------
+// Resume resolution — Course Run lifecycle.
+//
+// Superseded design note: earlier deliveries special-cased an active
+// `practice_attempts` row (status='in_progress') as authoritative over
+// a stream-based completion scan, because that scan read
+// `assessments.is_accepted`/`exercise_attempts` with NO notion of "this
+// pass through the course" — a mentee's PRIOR pass's accepted sentences
+// and exercise submissions counted toward completion forever, so a
+// fresh "Practice Again" attempt got misread as already-done work. That
+// special case is gone: every completion check below is scoped to the
+// mentee's ACTIVE `CourseRun` via `activityRegistry`, so the walk itself
+// now naturally lands on the first sentence/exercise not yet done THIS
+// run — no separate short-circuit needed to get the same answer.
+//
+// getOrCreateActiveRun (progressionService) finds the mentee's
+// `in_progress` CourseRun for this course, or mints one — this is the
+// container every `isCompleted` check below is scoped against.
+// Completion criteria live in activityRegistry, keyed by item_type, so
+// a future activity type only needs its own registry entry, never a
+// change here.
+//
+// Returns null for a missing/empty course. Otherwise one of:
+//   { status: 'incomplete', item, is_finished: false, run_id }   — first incomplete stream entry, this run
+//   { status: 'completed', item, is_finished: true, run_id, stats } — every
+//     step done THIS run. item is the first stream entry (a "Review
+//     Course" landing point — there's no single natural "next" item
+//     once nothing is left).
+// ---------------------------------------------------------------------
+async function getResumeItem(courseId, menteeId) {
+  const stream = await getCoursePlayStream(courseId);
+  if (!stream || !stream.length) return null;
+
+  const activeRun = await progressionService.getOrCreateActiveRun(courseId, menteeId);
+  if (activeRun.total_steps !== stream.length) {
+    await activeRun.update({ total_steps: stream.length });
+  }
+
+  for (const step of stream) {
+    const provider = activityRegistry[step.item_type];
+    const done = provider ? await provider.isCompleted(step, menteeId, activeRun) : false;
+    if (!done) {
+      if (activeRun.current_step_index !== step.step_index) {
+        await activeRun.update({ current_step_index: step.step_index });
+      }
+      return { status: "incomplete", item: step, is_finished: false, run_id: activeRun.id };
+    }
+  }
+
+  // Every step complete, this run.
+  if (activeRun.status !== "completed") {
+    await activeRun.update({
+      status: "completed",
+      completed_at: new Date(),
+      current_step_index: stream.length,
+    });
+  }
+
+  const stats = await computeRunStats(stream, menteeId, activeRun);
+
+  return {
     status: "completed",
     item: stream[0],
     is_finished: true,
-    stats: {
-      totalContents: contentIds.length,
-      completedContents: completedContentIds.size,
-      totalAssessments: assessmentIds.length,
-      assessmentsTaken: bestPercentageByExercise.size,
-      overallAverageScore,
-    },
+    run_id: activeRun.id,
+    stats,
   };
 }
 

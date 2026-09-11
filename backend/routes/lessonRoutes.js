@@ -56,6 +56,15 @@ router.get(
   allowRoles("mentee"),
   courseStreamController.getResumeTarget,
 );
+// Course Run lifecycle — "Practice Again" starts an explicit fresh run
+// (closes any dangling in_progress run as abandoned) rather than
+// relying on incidental find-or-create semantics elsewhere.
+router.post(
+  "/:lessonId/start-run",
+  verifyToken,
+  allowRoles("mentee"),
+  courseStreamController.startRun,
+);
 
 router.put(
   "/:id",

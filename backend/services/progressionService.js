@@ -5,6 +5,7 @@ const {
   PracticeAttempt,
   PracticeSession,
   MenteeCefrMilestone,
+  CourseRun,
 } = require("../models");
 const { Op, fn, col } = require("sequelize");
 const { CEFR_LEVELS, nextLevel, isLevelLocked } = require("../constants/cefrLevels");
@@ -12,6 +13,7 @@ const PRACTICE_ATTEMPT_STATUSES = require("../constants/practiceAttemptStatuses"
 const PRACTICE_SESSION_STATUSES = require("../constants/practiceSessionStatuses");
 const LESSON_STATUSES = require("../constants/lessonStatuses");
 const { PASS_THRESHOLD } = require("../constants/progressionConfig");
+const COURSE_RUN_STATUSES = require("../constants/courseRunStatuses");
 
 // Requirement 1.1: average of the OFFICIAL submitted score (practice_
 // sessions.score — mirrored there by assessmentPersistenceService on
@@ -173,9 +175,101 @@ async function getCefrProgress(menteeId) {
   return { currentLevel: mentee.current_cefr_level, milestones };
 }
 
+// ---------------------------------------------------------------------
+// Course Run lifecycle.
+//
+// One `course_runs` row per (mentee, course) "pass" — the container
+// courseStreamService.getResumeItem scopes progression against, via
+// activityRegistry. Fixes the "Practice Again" leak: without a run
+// boundary, a mentee's exercise/sentence submissions from a PRIOR pass
+// counted toward a NEW pass's completion forever, since the old
+// completion checks had no notion of "this pass" at all.
+// ---------------------------------------------------------------------
+
+async function nextRunNumber(courseId, menteeId, transaction) {
+  const lastRun = await CourseRun.findOne({
+    where: { mentee_id: menteeId, course_id: courseId },
+    order: [["run_number", "DESC"]],
+    transaction,
+  });
+  return lastRun ? lastRun.run_number + 1 : 1;
+}
+
+// Finds the mentee's currently `in_progress` run for this course, or
+// creates one (run_number 1, or the next number after whatever runs
+// already exist) if none is open. This is the read path — opening a
+// lesson, resuming, or submitting into it — never force-closes an
+// existing open run; only startNewRun (below) does that.
+async function getOrCreateActiveRun(courseId, menteeId) {
+  return sequelize.transaction(async (transaction) => {
+    let run = await CourseRun.findOne({
+      where: {
+        mentee_id: menteeId,
+        course_id: courseId,
+        status: COURSE_RUN_STATUSES.IN_PROGRESS,
+      },
+      order: [["created_at", "DESC"]],
+      transaction,
+    });
+
+    if (!run) {
+      run = await CourseRun.create(
+        {
+          mentee_id: menteeId,
+          course_id: courseId,
+          run_number: await nextRunNumber(courseId, menteeId, transaction),
+          status: COURSE_RUN_STATUSES.IN_PROGRESS,
+          started_at: new Date(),
+        },
+        { transaction },
+      );
+    }
+
+    return run;
+  });
+}
+
+// "Practice Again" — an explicit, unambiguous reset: closes every run
+// this mentee has left `in_progress` for this course (abandoned, not
+// deleted — their attempt rows and history stay attributable via
+// course_run_id) and opens a fresh one at run_number N+1, step 0. Not
+// the same as getOrCreateActiveRun finding no open run and minting one
+// implicitly — this is for the case a genuinely open run exists and the
+// mentee explicitly wants to start over rather than resume it.
+async function startNewRun(courseId, menteeId) {
+  return sequelize.transaction(async (transaction) => {
+    await CourseRun.update(
+      { status: COURSE_RUN_STATUSES.ABANDONED },
+      {
+        where: {
+          mentee_id: menteeId,
+          course_id: courseId,
+          status: COURSE_RUN_STATUSES.IN_PROGRESS,
+        },
+        transaction,
+      },
+    );
+
+    const run = await CourseRun.create(
+      {
+        mentee_id: menteeId,
+        course_id: courseId,
+        run_number: await nextRunNumber(courseId, menteeId, transaction),
+        status: COURSE_RUN_STATUSES.IN_PROGRESS,
+        started_at: new Date(),
+      },
+      { transaction },
+    );
+
+    return run;
+  });
+}
+
 module.exports = {
   computeAttemptOverallScore,
   evaluateAndAdvanceCefr,
   getCefrProgress,
   isLessonLocked,
+  getOrCreateActiveRun,
+  startNewRun,
 };

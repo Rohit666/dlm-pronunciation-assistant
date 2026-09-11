@@ -27,6 +27,15 @@ export const getCourseResume = async (lessonId) => {
   return response.data;
 };
 
+// Course Run lifecycle — "Practice Again" only. Explicitly closes any
+// run the mentee left in_progress for this course and opens a fresh
+// one at step 0, so the next resume resolution scores completion
+// against THIS pass, not whatever an earlier pass already submitted.
+export const startCourseRun = async (lessonId) => {
+  const response = await api.post(`/lessons/${lessonId}/start-run`);
+  return response.data;
+};
+
 // itemType: 'content' | 'assessment'
 export const updateCourseProgress = async (lessonId, itemType, itemId) => {
   const response = await api.post(`/lessons/${lessonId}/progress`, {

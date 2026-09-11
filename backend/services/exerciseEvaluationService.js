@@ -1,6 +1,7 @@
 const { sequelize, LessonExercise, ExerciseQuestion, ExerciseAttempt, ExerciseAttemptAnswer } =
   require("../models");
 const QUESTION_TYPES = require("../constants/exerciseQuestionTypes");
+const progressionService = require("./progressionService");
 
 // ---------------------------------------------------------------------
 // Payload contracts (JSON columns — documented here since the schema
@@ -433,10 +434,23 @@ async function submitExerciseAttempt({ exerciseId, menteeId, answers }) {
     const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 10000) / 100 : 0;
     const passed = percentage >= Number(exercise.passing_percentage);
 
+    // Course Run lifecycle — bind this attempt to whatever run is
+    // currently active for this mentee+course (exercise.lesson_id IS
+    // the course id). getOrCreateActiveRun runs its own transaction,
+    // independent of this one — course_runs is a separate table, no
+    // lock contention with the exercise-submission work above, and run
+    // lifecycle doesn't need to be atomic with one exercise submission.
+    // Without this, courseStreamService.getResumeItem/activityRegistry's
+    // run-scoped completion check could never be satisfied by this
+    // attempt, and the mentee's stream would appear permanently
+    // incomplete for this exercise even after submitting it.
+    const activeRun = await progressionService.getOrCreateActiveRun(exercise.lesson_id, menteeId);
+
     const attempt = await ExerciseAttempt.create(
       {
         exercise_id: exerciseId,
         mentee_id: menteeId,
+        course_run_id: activeRun.id,
         attempt_number: attemptNumber,
         total_score: totalScore,
         max_score: maxScore,
