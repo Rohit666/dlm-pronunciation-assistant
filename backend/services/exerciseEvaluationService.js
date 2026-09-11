@@ -2,6 +2,7 @@ const { sequelize, LessonExercise, ExerciseQuestion, ExerciseAttempt, ExerciseAt
   require("../models");
 const QUESTION_TYPES = require("../constants/exerciseQuestionTypes");
 const progressionService = require("./progressionService");
+const aiRuntimeService = require("./aiRuntimeService");
 
 // ---------------------------------------------------------------------
 // Payload contracts (JSON columns — documented here since the schema
@@ -24,8 +25,21 @@ const progressionService = require("./progressionService");
 //
 // paragraph:
 //   content_payload: { passage?: string }
-//   grading_rubric:  { keywords: string[], min_word_count?: number, model_answer?: string }
+//   grading_rubric:  { keywords: string[], min_word_count?: number,
+//                       max_word_count?: number, passing_percentage?: number,
+//                       model_answer?: string }
 //   student_answer:  string  (free text)
+//   Milestone 10: max_word_count/passing_percentage are new, optional,
+//   read straight off the existing untyped JSON rubric column — no
+//   migration needed. Graded by the offline Python AI runtime's
+//   POST /evaluate/paragraph when reachable (gradeParagraph below),
+//   falling back to the pre-existing local heuristic
+//   (gradeParagraphFallback, ex-gradeOpenResponse) when it isn't.
+//   Disclosed gap: ExerciseBuilderDrawer.jsx's mentor UI only exposes
+//   keywords + min_word_count today — max_word_count/passing_percentage
+//   are supported end-to-end by this grader and the AI runtime's rubric
+//   schema, but have no builder input yet; not in this ticket's file
+//   list, not touched.
 //
 // comprehension — COMPOSITE, not a writing drill: one reading passage
 // with a nested list of auto-gradable sub-questions (mcq/true_false/
@@ -139,11 +153,11 @@ function gradeSentenceFormation(question, studentAnswer) {
   };
 }
 
-// Heuristic keyword/length matcher — deliberately NOT full NLP grading.
-// Structured so Milestone 10 can swap this function's body for a call
-// into the local Python AI runtime without touching the caller
-// (gradeAnswer / submitExerciseAttempt below never need to change).
-function gradeOpenResponse(question, studentAnswer) {
+// Milestone 10 fallback path — the pre-existing heuristic keyword/length
+// matcher, kept verbatim and renamed. Used only when the Python AI
+// runtime is unreachable (see gradeParagraph below), so student
+// submissions are never blocked on the offline evaluator being down.
+function gradeParagraphFallback(question, studentAnswer) {
   const rubric = question.grading_rubric || {};
   const keywords = rubric.keywords || [];
   const minWordCount = rubric.min_word_count || 0;
@@ -179,6 +193,46 @@ function gradeOpenResponse(question, studentAnswer) {
   }
 
   return { isCorrect, scoreAwarded, feedback: feedbackParts.join(" ") };
+}
+
+// Milestone 10 — dispatches `paragraph` grading to the offline Python AI
+// runtime (multi-dimensional: keyword coverage/length/mechanics/lexical
+// diversity — see ai-runtime/app/services/paragraph/
+// paragraph_evaluation_service.py), with a graceful fallback to the
+// pure-JS heuristic above when the runtime is offline, times out, or
+// errors — a submission is never blocked on it. attemptAnswerId is
+// always null here (see aiRuntimeService.evaluateParagraph's own
+// comment) — this function runs during grading, before the
+// exercise_attempt_answers row exists.
+async function gradeParagraph(question, studentAnswer) {
+  const rubric = question.grading_rubric || {};
+  const text = typeof studentAnswer === "string" ? studentAnswer : "";
+
+  try {
+    const result = await aiRuntimeService.evaluateParagraph({
+      attemptAnswerId: null,
+      prompt: question.prompt,
+      studentText: text,
+      rubric: {
+        points: question.points,
+        min_word_count: rubric.min_word_count,
+        max_word_count: rubric.max_word_count,
+        keywords: rubric.keywords || [],
+        passing_percentage: rubric.passing_percentage,
+      },
+    });
+
+    return {
+      isCorrect: Boolean(result.is_correct),
+      scoreAwarded: Number(result.score_awarded) || 0,
+      feedback: result.feedback || "",
+    };
+  } catch (error) {
+    console.warn(
+      `Paragraph AI evaluator unreachable, falling back to local heuristic: ${error.message}`,
+    );
+    return gradeParagraphFallback(question, studentAnswer);
+  }
 }
 
 // Grades one sub-question of a composite comprehension question. A
@@ -349,7 +403,11 @@ function formatAttemptSummary(attempt, passingPercentage) {
 }
 
 // Single dispatch point — the only place question_type is switched on.
-function gradeAnswer(question, studentAnswer) {
+// Milestone 10: async now (PARAGRAPH awaits the AI runtime call) — its
+// one caller (submitExerciseAttempt's grading loop, below) already
+// awaits it; every other case still returns synchronously, which an
+// async function handles fine (auto-wrapped in a resolved Promise).
+async function gradeAnswer(question, studentAnswer) {
   switch (question.question_type) {
     case QUESTION_TYPES.MCQ:
     case QUESTION_TYPES.TRUE_FALSE:
@@ -361,7 +419,7 @@ function gradeAnswer(question, studentAnswer) {
     case QUESTION_TYPES.COMPREHENSION:
       return gradeComprehension(question, studentAnswer);
     case QUESTION_TYPES.PARAGRAPH:
-      return gradeOpenResponse(question, studentAnswer);
+      return gradeParagraph(question, studentAnswer);
     default:
       // Unknown type — never silently pass; a mis-tagged question should
       // surface as a zero, not a false pass.
@@ -407,7 +465,7 @@ async function submitExerciseAttempt({ exerciseId, menteeId, answers }) {
 
     for (const question of questions) {
       const studentAnswer = answerByQuestionId.get(String(question.id)) ?? null;
-      const graded = gradeAnswer(question, studentAnswer);
+      const graded = await gradeAnswer(question, studentAnswer);
       const { isCorrect, scoreAwarded, feedback } = graded;
       const questionMaxPoints = getQuestionMaxPoints(question);
 

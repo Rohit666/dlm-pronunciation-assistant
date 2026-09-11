@@ -21,5 +21,6 @@ def health():
             "speech": True,
             "tts": True,
             "assessment": False,
+            "paragraphEvaluation": True,
         },
     }
