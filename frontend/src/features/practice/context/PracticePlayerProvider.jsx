@@ -6,6 +6,7 @@ import {
   completePracticeAttempt,
   updatePracticeProgress,
 } from "../../../services/practiceAttemptService";
+import { getCourseResume } from "../../../services/courseStreamService";
 import { ROUTES } from "../../../constants/routes";
 
 const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
@@ -88,7 +89,33 @@ const PracticePlayerProvider = ({ lessonId, attemptId, children }) => {
       if (isLastSentence) {
         await completePracticeAttempt(attemptId);
 
-        navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}/complete/${attemptId}`);
+        // Seamless auto-transition: finishing the last sentence of this
+        // content attempt must NOT stop at "Lesson Complete!" unless
+        // this was genuinely the final activity in the whole course
+        // stream. Re-resolve against getResumeItem (via getCourseResume,
+        // the same run-scoped resolver everything else in the stream
+        // uses) rather than assuming "last sentence submitted" means
+        // "course done" — an assessment or another activity may still
+        // follow. `resume.item.route` is the same activityRegistry-
+        // resolved URL AssessmentPlayerPage's goToNextStreamItem already
+        // consumes, so this needs no per-item-type switch of its own.
+        try {
+          const resume = await getCourseResume(lessonId);
+          if (resume?.status === "completed") {
+            navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}/complete/${attemptId}`);
+          } else if (resume?.item?.route) {
+            navigate(resume.item.route);
+          } else {
+            navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}/complete/${attemptId}`);
+          }
+        } catch (resumeError) {
+          console.error(resumeError);
+          // Resolution failed — fall back to the old always-show-the-
+          // completion-page behavior rather than stranding the mentee
+          // with no navigation at all. PracticeCompletePage itself
+          // re-verifies on mount and forwards onward if steps remain.
+          navigate(`${ROUTES.MENTEE_PRACTICE}/${lessonId}/complete/${attemptId}`);
+        }
 
         return;
       }
